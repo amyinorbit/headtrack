@@ -1,0 +1,8 @@
+.DS_Store
+*.xpl
+*.ignore
+build.*
+.cache
+.cland
+compile_commands.json
+build
