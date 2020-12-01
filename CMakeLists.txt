@@ -4,7 +4,7 @@ project(htrack VERSION 2011.1 LANGUAGES C)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-find_package(ccore REQUIRED)
+add_subdirectory(lib/ccore)
 
 if(APPLE)
     link_directories(/usr/local/lib)
