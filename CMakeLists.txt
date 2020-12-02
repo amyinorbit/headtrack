@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.12)
-project(htrack VERSION 2012.2.0 LANGUAGES C CXX)
+project(htrack VERSION 2012.2.1 LANGUAGES C CXX)
 
 add_subdirectory(lib/ccore)
 if(APPLE)
@@ -47,7 +47,7 @@ include_directories(${PROJECT_NAME} PUBLIC
 )
 
 add_definitions(-DXPLM200=1 -DXPLM210=1 -DXPLM300=1 -DXPLM301=1)
-target_compile_options(${PROJECT_NAME} PUBLIC -Wall -Wextra -pedantic -fno-exceptions)
+target_compile_options(${PROJECT_NAME} PUBLIC -Wall -Wextra -fno-exceptions)
 
 if(WIN32)
     target_link_libraries(${PROJECT_NAME} wsock32 ws2_32 opengl32)

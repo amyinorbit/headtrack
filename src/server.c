@@ -43,12 +43,17 @@ static void *udp_track_server(void * data) {
     double udp_data[6];
     while(server_is_running) {
         ssize_t bytes = recvfrom(server_socket, (void*)udp_data, sizeof(udp_data), 0, NULL, NULL);
-        if(bytes < 0) continue;
+        if(bytes < 0) {
+            if(errno != EAGAIN) {
+                CCWARN("server: %s", strerror(errno));
+            }
+            continue;
+        }
         for(int i = 0; i < 6; ++i) {
             head_in[i] = lerp(
                 head_in[i],
                 udp_data[i],
-                1.0 - 0.9 * htk_settings.input_smooth
+                1.0 - 0.99 * htk_settings.input_smooth
             );
         }
     }

@@ -61,7 +61,7 @@ public:
         ImGui::Text("HeadTrack %s by Amy Alex Parent.", HTK_VERSION);
         ImGui::Dummy(ImVec2(0, 10.f));
         ImGui::PushStyleColor(ImGuiCol_Text, nice_pink);
-        ImGui::TextWrapped("HeadTrack will always be free, but you can support my X-Plane work by buying me a coffee <3\nbuymeacoffee.com/amyinorbit");
+        ImGui::TextWrapped("HeadTrack will always be free, but you can support my X-Plane work by buying me a coffee <3\nko-fi.com/amyinorbit");
         ImGui::PopStyleColor();
         ImGui::Dummy(ImVec2(0, 10.f));
         ImGui::Separator();

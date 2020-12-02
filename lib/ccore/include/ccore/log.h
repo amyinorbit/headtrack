@@ -19,9 +19,6 @@ extern "C" {
 #ifdef NDEBUG
 
 #define CCDEBUG(fmt, ...)
-#define CCINFO(fmt, ...)
-#define CCWARN(fmt, ...)
-#define CCERROR(fmt, ...)
 
 #define CCASSERT(expr)
 
@@ -35,11 +32,11 @@ extern "C" {
     } \
 } while(0)
 
+#endif
+
 #define CCINFO(...) cc_log(LOG_INFO, __func__, __VA_ARGS__)
 #define CCWARN(...) cc_log(LOG_WARN, __func__, __VA_ARGS__)
 #define CCERROR(...) cc_log(LOG_ERROR, __func__, __VA_ARGS__)
-
-#endif
 
 #define CCUNREACHABLE() (__builtin_unreachable())
 #define CCUNUSED(v) ((void)(v))

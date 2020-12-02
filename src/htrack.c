@@ -109,9 +109,13 @@ void htk_setup() {
 static XPLMDataRef find_dref_checked(const char *path, bool strict) {
     XPLMDataRef dr = XPLMFindDataRef(path);
     if(!dr) {
-        CCERROR("dataref `%s` not found", path);
-        state.is_failed = true;
-        if(strict) abort();
+        if(strict) {
+            CCERROR("dataref `%s` not found", path);
+            state.is_failed = true;
+            abort();
+        } else {
+            CCINFO("optional dataref `%s` not found", path);
+        }
     } else {
         CCINFO("dataref `%s` found", path);
     }
