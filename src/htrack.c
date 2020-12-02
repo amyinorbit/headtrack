@@ -62,23 +62,28 @@ struct {
         XPLMDataRef headshake;
     } dr;
     XPLMCommandRef toggle_cmd;
-    XPLMCommandRef set_neutral_cmd;
+    XPLMCommandRef center_head_tracking;
+    XPLMCommandRef center_sim_view;
+
+    struct {
+        XPLMMenuID id;
+        int settings;
+        int enabled;
+        int home;
+    } menu;
 } state;
 
 htk_settings_t htk_settings;
 
 const char *htk_cmd_toggle = "amyinorbit/htrack/toggle";
-const char *htk_cmd_center = "amyinorbit/htrack/set_center";
+const char *htk_cmd_center_head = "amyinorbit/htrack/center_head";
+const char *htk_cmd_center_sim = "amyinorbit/htrack/center_sim";
 
-static const htk_settings_t defaults = {
-    .axes_invert = {true, false, false, false, false, true},
-    .axes_limits = {50.f, 50.f, 50.f, 75.f, 75.f, 90.f},
-    .rotation_smooth = .5f,
-    .translation_smooth = .5f
-};
 
 void htk_setup() {
-    htk_settings = defaults;
+    htk_settings.last_error = NULL;
+    settings_load(true);
+    // htk_settings = defaults;
 
     state.is_failed = false;
     state.is_enabled = false;
@@ -86,10 +91,12 @@ void htk_setup() {
     state.server_is_running = false;
     state.must_reset = true;
 
-    state.toggle_cmd = XPLMCreateCommand(htk_cmd_toggle, "toggle head tracking mode");
+    state.toggle_cmd = XPLMCreateCommand(htk_cmd_toggle, "toggle head tracking");
     CCASSERT(state.toggle_cmd);
-    state.set_neutral_cmd = XPLMCreateCommand(htk_cmd_center, "set center head position");
-    CCASSERT(state.set_neutral_cmd);
+    state.center_head_tracking = XPLMCreateCommand(htk_cmd_center_head, "recenter head tracking");
+    CCASSERT(state.center_head_tracking);
+    state.center_sim_view = XPLMCreateCommand(htk_cmd_center_sim, "recenter sim view");
+    CCASSERT(state.center_sim_view);
 
     state.dr.view_type = NULL;
 
@@ -106,6 +113,11 @@ void htk_setup() {
     state.dr.head_rll = NULL;
 
     state.dr.headshake = NULL;
+
+    state.menu.id = 0;
+    state.menu.enabled = -1;
+    state.menu.home = -1;
+    state.menu.settings = -1;
 }
 
 static XPLMDataRef find_dref_checked(const char *path, bool strict) {
@@ -126,6 +138,12 @@ static int toggle_cb(XPLMCommandRef cmd, XPLMCommandPhase phase, void *refcon) {
     if(phase != xplm_CommandBegin) return 1;
 
     state.is_enabled = !state.is_enabled;
+    // Reflect tracking statein the menu.
+    XPLMCheckMenuItem(
+        state.menu.id,
+        state.menu.enabled,
+        state.is_enabled  ? xplm_Menu_Checked : xplm_Menu_NoCheck
+    );
     CCINFO("head tracking is %s", state.is_enabled ? "on" : "off");
     if(state.dr.headshake) {
         XPLMSetDatai(state.dr.headshake, state.is_enabled);
@@ -133,7 +151,7 @@ static int toggle_cb(XPLMCommandRef cmd, XPLMCommandPhase phase, void *refcon) {
     return 1;
 }
 
-static int set_neutral_cb(XPLMCommandRef cmd, XPLMCommandPhase phase, void *refcon) {
+static int center_head_cb(XPLMCommandRef cmd, XPLMCommandPhase phase, void *refcon) {
     CCUNUSED(cmd);
     CCUNUSED(refcon);
     if(phase != xplm_CommandBegin) return 1;
@@ -143,116 +161,19 @@ static int set_neutral_cb(XPLMCommandRef cmd, XPLMCommandPhase phase, void *refc
     return 1;
 }
 
+static int center_sim_cb(XPLMCommandRef cmd, XPLMCommandPhase phase, void *refcon) {
+    CCUNUSED(cmd);
+    CCUNUSED(refcon);
+    if(phase != xplm_CommandBegin) return 1;
+    state.viewport_ref[0] = XPLMGetDataf(state.dr.head_x);
+    state.viewport_ref[1] = XPLMGetDataf(state.dr.head_y);
+    state.viewport_ref[2] = XPLMGetDataf(state.dr.head_z);
+    CCINFO("saved pilot's head location");
+    return 1;
+}
+
 #include <errno.h>
 #include <stdio.h>
-
-static void *server(void * data) {
-    CCUNUSED(data);
-    CCINFO("starting head tracking server");
-
-
-    struct sockaddr_in server_addr;
-    memset(&server_addr, 0, sizeof(server_addr));
-
-    state.server_socket = socket(PF_INET, SOCK_DGRAM, 0);
-
-    struct timeval timeout;
-    timeout.tv_sec = 0;
-    timeout.tv_usec = 250000;
-
-    setsockopt(state.server_socket, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout));
-
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(4242);
-    server_addr.sin_addr.s_addr = inet_addr("0.0.0.0");
-    memset(server_addr.sin_zero, 0, sizeof(server_addr.sin_zero));
-
-    // Bind the socket
-    (void)bind(state.server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr));
-
-    CCINFO("head tracking server on");
-    state.server_is_running = true;
-    double udp_data[6];
-    while(state.server_is_running) {
-        ssize_t bytes = recvfrom(state.server_socket, (void*)udp_data, sizeof(udp_data), 0, NULL, NULL);
-        if(bytes > 0) {
-            for(int i = 0; i < 6; ++i) {
-                state.head_in[i] = 0.9 * state.head_in[i] + 0.1 * udp_data[i];
-            }
-        }
-
-    }
-
-    CCINFO("shutting down head tracking server");
-    close(state.server_socket);
-
-    return NULL;
-}
-
-static void menu_cb(void *menu, void *refcon) {
-    CCUNUSED(menu);
-
-    switch((uint64_t)refcon) {
-    case 3: settings_show(); break;
-    default: break;
-    }
-}
-
-void htk_start() {
-    CCINFO("finding plane rotation datarefs");
-
-    for(int i = 0; i < 6; ++i) {
-        state.head_in[i] = 0.0;
-        state.neutral[i] = 0.0;
-    }
-
-    int slot = XPLMAppendMenuItem(XPLMFindPluginsMenu(), "HeadTrack", NULL, 0);
-    XPLMMenuID htk_menu = XPLMCreateMenu("HeadTrack", XPLMFindPluginsMenu(), slot, menu_cb, NULL);
-    XPLMAppendMenuItemWithCommand(htk_menu, "Toggle Head Tracking", state.toggle_cmd);
-    XPLMAppendMenuItemWithCommand(htk_menu, "Set Neutral Head Position", state.set_neutral_cmd);
-    XPLMAppendMenuItem(htk_menu, "Settings...", (void *)3, 0);
-
-    state.dr.view_type = find_dref_checked("sim/graphics/view/view_type", true);
-    state.dr.ref_x = find_dref_checked("sim/aircraft/view/acf_peX", true);
-    state.dr.ref_y = find_dref_checked("sim/aircraft/view/acf_peY", true);
-    state.dr.ref_z = find_dref_checked("sim/aircraft/view/acf_peZ", true);
-
-    CCINFO("finding pilot's head rotation datarefs");
-    state.dr.head_pit = find_dref_checked("sim/graphics/view/pilots_head_the", true);
-    state.dr.head_hdg = find_dref_checked("sim/graphics/view/pilots_head_psi", true);
-    state.dr.head_rll = find_dref_checked("sim/graphics/view/pilots_head_phi", true);
-
-    state.dr.head_x = find_dref_checked("sim/graphics/view/pilots_head_x", true);
-    state.dr.head_y = find_dref_checked("sim/graphics/view/pilots_head_y", true);
-    state.dr.head_z = find_dref_checked("sim/graphics/view/pilots_head_z", true);
-
-    state.dr.headshake = find_dref_checked("simcoders/headshake/override", false);
-
-    CCINFO("installing command handler");
-    XPLMRegisterCommandHandler(state.toggle_cmd, toggle_cb, 0, NULL);
-    XPLMRegisterCommandHandler(state.set_neutral_cmd, set_neutral_cb, 0, NULL);
-
-    CCINFO("starting head tracking server");
-    pthread_create(&state.server_thread, NULL, server, NULL);
-
-}
-
-void htk_stop() {
-    XPLMUnregisterCommandHandler(state.toggle_cmd, toggle_cb, 0, NULL);
-    XPLMUnregisterCommandHandler(state.set_neutral_cmd, set_neutral_cb, 0, NULL);
-    state.server_is_running = false;
-    state.is_enabled = false;
-    pthread_join(state.server_thread, NULL);
-}
-
-void htk_cleanup() {
-    settings_cleanup();
-}
-/*
-static inline double clampd(double v, double low, double high) {
-    return v > high ? high : v < low ? low : v;
-}
-*/
 
 static inline double normalize_rot(double hdg) {
     if(hdg < 180.0) hdg += 360.0;
@@ -277,6 +198,142 @@ static inline void normd3(double v[3]) {
     v[2] = normalize_rot(v[2]);
 }
 
+static inline double clampd(double v, double low, double high) {
+    return v > high ? high : v < low ? low : v;
+}
+
+static inline double lerp(double a, double b, double t) {
+    t = clampd(t, 0, 1);
+    return a * (1.0 - t) + b * t;
+}
+
+static void *server(void * data) {
+    CCUNUSED(data);
+    CCINFO("Head tracking server now listening on 0.0.0.0:4242");
+    state.server_is_running = true;
+    double udp_data[6];
+    while(state.server_is_running) {
+        ssize_t bytes = recvfrom(state.server_socket, (void*)udp_data, sizeof(udp_data), 0, NULL, NULL);
+        if(bytes < 0) continue;
+        for(int i = 0; i < 6; ++i) {
+            state.head_in[i] = lerp(
+                state.head_in[i],
+                udp_data[i],
+                1.0 - 0.9 * htk_settings.input_smooth
+            );
+        }
+    }
+
+    CCINFO("shutting down head tracking server");
+    close(state.server_socket);
+
+    return NULL;
+}
+
+static void start_server() {
+    CCINFO("starting head tracking server");
+
+
+    struct sockaddr_in server_addr;
+    memset(&server_addr, 0, sizeof(server_addr));
+
+    state.server_socket = socket(PF_INET, SOCK_DGRAM, 0);
+
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 250000;
+
+    setsockopt(state.server_socket, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout));
+
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(4242);
+    server_addr.sin_addr.s_addr = inet_addr("0.0.0.0");
+    memset(server_addr.sin_zero, 0, sizeof(server_addr.sin_zero));
+
+    // Bind the socket
+    if(bind(state.server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr))) {
+        htk_settings.last_error = strerror(errno);
+        CCERROR("unable to start server: %s", htk_settings.last_error);
+        return;
+    } else {
+    }
+
+    pthread_create(&state.server_thread, NULL, server, NULL);
+}
+
+static void menu_cb(void *menu, void *refcon) {
+    CCUNUSED(menu);
+    CCUNUSED(refcon);
+    settings_show();
+    // Reflect settings window state in the menu;
+    XPLMCheckMenuItem(
+        state.menu.id,
+        state.menu.settings,
+        settings_is_visible() ? xplm_Menu_Checked : xplm_Menu_NoCheck
+    );
+}
+
+void htk_start() {
+    CCINFO("finding plane rotation datarefs");
+
+    for(int i = 0; i < 6; ++i) {
+        state.head_in[i] = 0.0;
+        state.neutral[i] = 0.0;
+    }
+
+    CCINFO("installing command handler");
+    XPLMRegisterCommandHandler(state.toggle_cmd, toggle_cb, 0, NULL);
+    XPLMRegisterCommandHandler(state.center_head_tracking, center_head_cb, 0, NULL);
+    XPLMRegisterCommandHandler(state.center_sim_view, center_sim_cb, 0, NULL);
+
+    int slot = XPLMAppendMenuItem(XPLMFindPluginsMenu(), "HeadTrack", NULL, 0);
+    state.menu.id = XPLMCreateMenu("HeadTrack", XPLMFindPluginsMenu(), slot, menu_cb, NULL);
+    state.menu.enabled = XPLMAppendMenuItemWithCommand(
+        state.menu.id, "Track Head Motion", state.toggle_cmd);
+    state.menu.home = XPLMAppendMenuItemWithCommand(
+        state.menu.id, "Recenter Head Tracking", state.center_head_tracking);
+    XPLMAppendMenuItemWithCommand(
+        state.menu.id, "Recenter Sim View", state.center_sim_view);
+    state.menu.settings = XPLMAppendMenuItem(state.menu.id, "Settings...", NULL, 0);
+
+    CCINFO("Setting up datarefs");
+
+    state.dr.view_type = find_dref_checked("sim/graphics/view/view_type", true);
+    state.dr.ref_x = find_dref_checked("sim/aircraft/view/acf_peX", true);
+    state.dr.ref_y = find_dref_checked("sim/aircraft/view/acf_peY", true);
+    state.dr.ref_z = find_dref_checked("sim/aircraft/view/acf_peZ", true);
+
+    state.dr.head_pit = find_dref_checked("sim/graphics/view/pilots_head_the", true);
+    state.dr.head_hdg = find_dref_checked("sim/graphics/view/pilots_head_psi", true);
+    state.dr.head_rll = find_dref_checked("sim/graphics/view/pilots_head_phi", true);
+
+    state.dr.head_x = find_dref_checked("sim/graphics/view/pilots_head_x", true);
+    state.dr.head_y = find_dref_checked("sim/graphics/view/pilots_head_y", true);
+    state.dr.head_z = find_dref_checked("sim/graphics/view/pilots_head_z", true);
+
+    state.dr.headshake = find_dref_checked("simcoders/headshake/override", false);
+
+    start_server();
+}
+
+void htk_stop() {
+    XPLMUnregisterCommandHandler(state.toggle_cmd, toggle_cb, 0, NULL);
+    XPLMUnregisterCommandHandler(state.center_head_tracking, center_head_cb, 0, NULL);
+    XPLMUnregisterCommandHandler(state.center_sim_view, center_sim_cb, 0, NULL);
+    state.server_is_running = false;
+    state.is_enabled = false;
+    pthread_join(state.server_thread, NULL);
+}
+
+void htk_cleanup() {
+    settings_cleanup();
+}
+/*
+static inline double clampd(double v, double low, double high) {
+    return v > high ? high : v < low ? low : v;
+}
+*/
+
 static const double limits_out[6] = {100, 100, 100, 135, 90, 90};
 
 
@@ -291,6 +348,7 @@ void htk_frame() {
     if(state.is_failed) return;
 
     if(state.must_reset) {
+        settings_load(true);
         state.must_reset = false;
         CCINFO("recording default pilot's head position");
         state.viewport_ref[0] = XPLMGetDataf(state.dr.ref_x);
@@ -318,6 +376,11 @@ void htk_frame() {
         htk_settings.axes_limits + 3,
         limits_out + 3,
         1.f + htk_settings.rotation_smooth);
+
+    for(int i = 0; i < 6; ++i) {
+        htk_settings.head[i] = state.head_in[i];
+        htk_settings.sim[i] = state.head[i];
+    }
 
     XPLMSetDataf(state.dr.head_x, 1e-2 * state.head[0] + state.viewport_ref[0]);
     XPLMSetDataf(state.dr.head_y, 1e-2 * state.head[1] + state.viewport_ref[1]);

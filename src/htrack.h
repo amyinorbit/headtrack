@@ -22,6 +22,13 @@ typedef struct {
     bool axes_invert[6];
     float rotation_smooth;
     float translation_smooth;
+
+    float input_smooth;
+
+    float head[6];
+    float sim[6];
+
+    const char *last_error;
 } htk_settings_t;
 extern htk_settings_t htk_settings;
 
@@ -36,6 +43,9 @@ void htk_reset_default_head();
 void settings_show();
 bool settings_is_visible();
 void settings_cleanup();
+
+void settings_load(bool global);
+bool settings_save(bool global);
 
 #ifdef __cplusplus
 } /* extern "C" */

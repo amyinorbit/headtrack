@@ -1,11 +1,14 @@
 cmake_minimum_required(VERSION 3.12)
-project(htrack VERSION 2011.1 LANGUAGES C CXX)
+project(htrack VERSION 2012.1 LANGUAGES C CXX)
 
 add_subdirectory(lib/ccore)
 if(APPLE)
     link_directories(/usr/local/lib)
 endif()
 
+
+find_package(Threads REQUIRED)
+find_package(cJSON REQUIRED)
 option(XPLANE_DIR "X-Plane's root directory" "/xp11")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS On)
@@ -13,6 +16,8 @@ set(PLUGIN_SRC
     src/main.c
     src/htrack.c
     src/settings.cpp
+    src/saving.c
+    src/paths.c
 
     lib/imgui/imgui.cpp
     lib/imgui/imgui_demo.cpp
@@ -45,7 +50,7 @@ else()
     add_definitions(-DAPL=0 -DIBM=0 -DLIN=1)
 endif()
 
-target_link_libraries(${PROJECT_NAME} m ccore)
+target_link_libraries(${PROJECT_NAME} m ccore cjson)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "")
 set_target_properties(${PROJECT_NAME}  PROPERTIES SUFFIX "")
