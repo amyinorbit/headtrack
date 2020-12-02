@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.12)
-project(htrack VERSION 2012.1 LANGUAGES C CXX)
+project(htrack VERSION 2012.2.0 LANGUAGES C CXX)
 
 add_subdirectory(lib/ccore)
 if(APPLE)
@@ -7,6 +7,7 @@ if(APPLE)
 endif()
 
 
+find_library(OPENGL_LIBRARY NAMES OpenGL)
 find_package(Threads REQUIRED)
 find_package(cJSON REQUIRED)
 option(XPLANE_DIR "X-Plane's root directory" "/xp11")
@@ -42,7 +43,7 @@ add_definitions(-DXPLM200=1 -DXPLM210=1 -DXPLM300=1 -DXPLM301=1)
 target_compile_options(${PROJECT_NAME} PUBLIC -Wall -Wextra -pedantic -fno-exceptions)
 
 if(WIN32)
-    target_link_libraries(${PROJECT_NAME} wsock32 ws2_32)
+    target_link_libraries(${PROJECT_NAME} wsock32 ws2_32 opengl32)
     add_definitions(-DAPL=0 -DIBM=1 -DLIN=0)
 elseif(APPLE)
     add_definitions(-DAPL=1 -DIBM=0 -DLIN=0)
@@ -62,6 +63,9 @@ if(APPLE)
 
     target_link_libraries(${PROJECT_NAME} ${XPLM_LIBRARY})
     target_link_libraries(${PROJECT_NAME} ${XPWIDGETS_LIBRARY})
+
+    target_compile_options(imgui4xp PUBLIC -mmacosx-version-min=10.10)
+    target_link_libraries(imgui4xp -mmacosx-version-min=10.10)
 elseif(WIN32)
     set(CMAKE_LIBRARY_PATH ${CMAKE_CURRENT_SOURCE_DIR}/sdk/Libraries/Win/)
     find_library(XPLM_LIBRARY
