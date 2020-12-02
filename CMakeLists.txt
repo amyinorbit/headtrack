@@ -46,7 +46,7 @@ include_directories(${PROJECT_NAME} PUBLIC
     "lib"
 )
 
-add_definitions(-DXPLM200=1 -DXPLM210=1 -DXPLM300=1 -DXPLM301=1)
+add_definitions(-DXPLM200=1 -DXPLM210=1 -DXPLM300=1 -DXPLM301=1 -DGL_SILENCE_DEPRECATION)
 target_compile_options(${PROJECT_NAME} PUBLIC -Wall -Wextra -fno-exceptions)
 
 if(WIN32)
@@ -54,6 +54,10 @@ if(WIN32)
     add_definitions(-DAPL=0 -DIBM=1 -DLIN=0)
 elseif(APPLE)
     add_definitions(-DAPL=1 -DIBM=0 -DLIN=0)
+    find_library(APPLICATION_SERVICES ApplicationServices)
+    find_library(CORE_FOUNDATION_LIBRARY CoreFoundation)
+    find_library(OpenGL_LIBRARY OpenGL)
+    target_link_libraries(${PROJECT_NAME} ${APPLICATION_SERVICES} ${CORE_FOUNDATION_LIBRARY} ${OpenGL_LIBRARY})
 else()
     add_definitions(-DAPL=0 -DIBM=0 -DLIN=1)
 endif()
@@ -70,9 +74,6 @@ if(APPLE)
 
     target_link_libraries(${PROJECT_NAME} ${XPLM_LIBRARY})
     target_link_libraries(${PROJECT_NAME} ${XPWIDGETS_LIBRARY})
-
-    target_compile_options(imgui4xp PUBLIC -mmacosx-version-min=10.10)
-    target_link_libraries(imgui4xp -mmacosx-version-min=10.10)
 elseif(WIN32)
     set(CMAKE_LIBRARY_PATH ${CMAKE_CURRENT_SOURCE_DIR}/sdk/Libraries/Win/)
     find_library(XPLM_LIBRARY
