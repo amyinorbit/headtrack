@@ -7,17 +7,8 @@
 // =^•.•^=
 //===--------------------------------------------------------------------------------------------===
 #include "htrack.h"
-#include <sys/types.h>
-#ifdef WIN32
-#include <winsock2.h>
-#else
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <arpa/inet.h>
-#endif
-#include <unistd.h>
-#include <string.h>
+#include "server.h"
+#include "math.h"
 
 #include <XPLMGraphics.h>
 #include <XPLMMenus.h>
@@ -26,18 +17,12 @@
 #include <stdlib.h>
 #include <tgmath.h>
 #include <pthread.h>
+#include <string.h>
 
 struct {
     bool is_enabled;
     bool is_failed;
-    bool is_inside;
-    bool server_is_running;
     bool must_reset;
-
-    pthread_mutex_t lock;
-    pthread_t server_thread;
-
-    int server_socket;
 
     double viewport_ref[3];
     double head_in[6]; // reported by UDP
@@ -61,9 +46,12 @@ struct {
 
         XPLMDataRef headshake;
     } dr;
-    XPLMCommandRef toggle_cmd;
-    XPLMCommandRef center_head_tracking;
-    XPLMCommandRef center_sim_view;
+
+    struct {
+        XPLMCommandRef toggle;
+        XPLMCommandRef center_head_tracking;
+        XPLMCommandRef center_sim_view;
+    } cmd;
 
     struct {
         XPLMMenuID id;
@@ -87,16 +75,14 @@ void htk_setup() {
 
     state.is_failed = false;
     state.is_enabled = false;
-    state.is_inside = false;
-    state.server_is_running = false;
     state.must_reset = true;
 
-    state.toggle_cmd = XPLMCreateCommand(htk_cmd_toggle, "toggle head tracking");
-    CCASSERT(state.toggle_cmd);
-    state.center_head_tracking = XPLMCreateCommand(htk_cmd_center_head, "recenter head tracking");
-    CCASSERT(state.center_head_tracking);
-    state.center_sim_view = XPLMCreateCommand(htk_cmd_center_sim, "recenter sim view");
-    CCASSERT(state.center_sim_view);
+    state.cmd.toggle = XPLMCreateCommand(htk_cmd_toggle, "toggle head tracking");
+    CCASSERT(state.cmd.toggle);
+    state.cmd.center_head_tracking = XPLMCreateCommand(htk_cmd_center_head, "recenter head tracking");
+    CCASSERT(state.cmd.center_head_tracking);
+    state.cmd.center_sim_view = XPLMCreateCommand(htk_cmd_center_sim, "recenter sim view");
+    CCASSERT(state.cmd.center_sim_view);
 
     state.dr.view_type = NULL;
 
@@ -172,95 +158,6 @@ static int center_sim_cb(XPLMCommandRef cmd, XPLMCommandPhase phase, void *refco
     return 1;
 }
 
-#include <errno.h>
-#include <stdio.h>
-
-static inline double normalize_rot(double hdg) {
-    if(hdg < 180.0) hdg += 360.0;
-    if(hdg >= 180.0) hdg -= 360.0;
-    return hdg;
-}
-
-static inline double remapd(double v, double old_m, double new_m, double factor) {
-    double old_n = v < 0 ? -pow(fabs(v) / old_m, factor) : pow(fabs(v) / old_m, factor);
-    return old_n * new_m;
-}
-
-static inline void remapd3(double v[3], const double old_m[3], const double new_m[3], const double factor) {
-    v[0] = remapd(v[0], old_m[0], new_m[0], factor);
-    v[1] = remapd(v[1], old_m[1], new_m[1], factor);
-    v[2] = remapd(v[2], old_m[2], new_m[2], factor);
-}
-
-static inline void normd3(double v[3]) {
-    v[0] = normalize_rot(v[0]);
-    v[1] = normalize_rot(v[1]);
-    v[2] = normalize_rot(v[2]);
-}
-
-static inline double clampd(double v, double low, double high) {
-    return v > high ? high : v < low ? low : v;
-}
-
-static inline double lerp(double a, double b, double t) {
-    t = clampd(t, 0, 1);
-    return a * (1.0 - t) + b * t;
-}
-
-static void *server(void * data) {
-    CCUNUSED(data);
-    CCINFO("Head tracking server now listening on 0.0.0.0:4242");
-    state.server_is_running = true;
-    double udp_data[6];
-    while(state.server_is_running) {
-        ssize_t bytes = recvfrom(state.server_socket, (void*)udp_data, sizeof(udp_data), 0, NULL, NULL);
-        if(bytes < 0) continue;
-        for(int i = 0; i < 6; ++i) {
-            state.head_in[i] = lerp(
-                state.head_in[i],
-                udp_data[i],
-                1.0 - 0.9 * htk_settings.input_smooth
-            );
-        }
-    }
-
-    CCINFO("shutting down head tracking server");
-    close(state.server_socket);
-
-    return NULL;
-}
-
-static void start_server() {
-    CCINFO("starting head tracking server");
-
-
-    struct sockaddr_in server_addr;
-    memset(&server_addr, 0, sizeof(server_addr));
-
-    state.server_socket = socket(PF_INET, SOCK_DGRAM, 0);
-
-    struct timeval timeout;
-    timeout.tv_sec = 0;
-    timeout.tv_usec = 250000;
-
-    setsockopt(state.server_socket, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout));
-
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(4242);
-    server_addr.sin_addr.s_addr = inet_addr("0.0.0.0");
-    memset(server_addr.sin_zero, 0, sizeof(server_addr.sin_zero));
-
-    // Bind the socket
-    if(bind(state.server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr))) {
-        htk_settings.last_error = strerror(errno);
-        CCERROR("unable to start server: %s", htk_settings.last_error);
-        return;
-    } else {
-    }
-
-    pthread_create(&state.server_thread, NULL, server, NULL);
-}
-
 static void menu_cb(void *menu, void *refcon) {
     CCUNUSED(menu);
     CCUNUSED(refcon);
@@ -282,18 +179,18 @@ void htk_start() {
     }
 
     CCINFO("installing command handler");
-    XPLMRegisterCommandHandler(state.toggle_cmd, toggle_cb, 0, NULL);
-    XPLMRegisterCommandHandler(state.center_head_tracking, center_head_cb, 0, NULL);
-    XPLMRegisterCommandHandler(state.center_sim_view, center_sim_cb, 0, NULL);
+    XPLMRegisterCommandHandler(state.cmd.toggle, toggle_cb, 0, NULL);
+    XPLMRegisterCommandHandler(state.cmd.center_head_tracking, center_head_cb, 0, NULL);
+    XPLMRegisterCommandHandler(state.cmd.center_sim_view, center_sim_cb, 0, NULL);
 
     int slot = XPLMAppendMenuItem(XPLMFindPluginsMenu(), "HeadTrack", NULL, 0);
     state.menu.id = XPLMCreateMenu("HeadTrack", XPLMFindPluginsMenu(), slot, menu_cb, NULL);
     state.menu.enabled = XPLMAppendMenuItemWithCommand(
-        state.menu.id, "Track Head Motion", state.toggle_cmd);
+        state.menu.id, "Track Head Motion", state.cmd.toggle);
     state.menu.home = XPLMAppendMenuItemWithCommand(
-        state.menu.id, "Recenter Head Tracking", state.center_head_tracking);
+        state.menu.id, "Recenter Head Tracking", state.cmd.center_head_tracking);
     XPLMAppendMenuItemWithCommand(
-        state.menu.id, "Recenter Sim View", state.center_sim_view);
+        state.menu.id, "Recenter Sim View", state.cmd.center_sim_view);
     state.menu.settings = XPLMAppendMenuItem(state.menu.id, "Settings...", NULL, 0);
 
     CCINFO("Setting up datarefs");
@@ -313,29 +210,23 @@ void htk_start() {
 
     state.dr.headshake = find_dref_checked("simcoders/headshake/override", false);
 
-    start_server();
+    if(!server_start(state.head_in)) state.is_failed = true;
 }
 
 void htk_stop() {
-    XPLMUnregisterCommandHandler(state.toggle_cmd, toggle_cb, 0, NULL);
-    XPLMUnregisterCommandHandler(state.center_head_tracking, center_head_cb, 0, NULL);
-    XPLMUnregisterCommandHandler(state.center_sim_view, center_sim_cb, 0, NULL);
-    state.server_is_running = false;
+    XPLMUnregisterCommandHandler(state.cmd.toggle, toggle_cb, 0, NULL);
+    XPLMUnregisterCommandHandler(state.cmd.center_head_tracking, center_head_cb, 0, NULL);
+    XPLMUnregisterCommandHandler(state.cmd.center_sim_view, center_sim_cb, 0, NULL);
     state.is_enabled = false;
-    pthread_join(state.server_thread, NULL);
+    server_stop();
 }
 
 void htk_cleanup() {
     settings_cleanup();
 }
-/*
-static inline double clampd(double v, double low, double high) {
-    return v > high ? high : v < low ? low : v;
-}
-*/
+
 
 static const double limits_out[6] = {100, 100, 100, 135, 90, 90};
-
 
 void htk_reset_default_head() {
     if(state.is_failed) return;
@@ -346,7 +237,6 @@ void htk_reset_default_head() {
 void htk_frame() {
 
     if(state.is_failed) return;
-
     if(state.must_reset) {
         settings_load(true);
         state.must_reset = false;
@@ -357,8 +247,7 @@ void htk_frame() {
     }
 
     int view_type = XPLMGetDatai(state.dr.view_type);
-    state.is_inside = view_type == 1026;
-    if(!state.is_inside || !state.is_enabled) return;
+    if(view_type != 1026 || !state.is_enabled) return;
 
     memcpy(state.head, state.head_in, sizeof(state.head));
 

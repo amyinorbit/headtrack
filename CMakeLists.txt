@@ -6,6 +6,13 @@ if(APPLE)
     link_directories(/usr/local/lib)
 endif()
 
+add_definitions(
+    "-DHTK_VERSION=\"${PROJECT_VERSION}\""
+    "-DHTK_VERSION_MAJOR=${PROJECT_MAJOR_VERSION}"
+    "-DHTK_VERSION_MINOR=${PROJECT_MINOR_VERSION}"
+    "-DHTK_VERSION_PATCH=${PROJECT_PATCH_VERSION}"
+)
+
 
 find_library(OPENGL_LIBRARY NAMES OpenGL)
 find_package(Threads REQUIRED)
@@ -19,9 +26,9 @@ set(PLUGIN_SRC
     src/settings.cpp
     src/saving.c
     src/paths.c
+    src/server.c
 
     lib/imgui/imgui.cpp
-    lib/imgui/imgui_demo.cpp
     lib/imgui/imgui_draw.cpp
     lib/imgui/imgui_widgets.cpp
     lib/imgui/misc/cpp/imgui_stdlib.cpp
