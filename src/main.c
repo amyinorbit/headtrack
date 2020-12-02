@@ -46,10 +46,10 @@ PLUGIN_API int XPluginStart(char * outName, char * outSig, char *outDesc) {
     strcpy(outSig, "com.amyinorbit.htrack");
     strcpy(outDesc, "Lightweight head tracking plugin");
     XPLMEnableFeature("XPLM_USE_NATIVE_PATHS", 1);
-    
+
     cc_set_log_name("headtrack");
     cc_set_printer(log_printer);
-    CCINFO("HeadTrack - version 2011.1");
+    CCINFO("HeadTrack - version %s - Amy Alex Parent", HTK_VERSION);
 
     htk_setup();
     return 1;
