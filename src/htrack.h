@@ -7,20 +7,23 @@
 // =^•.•^=
 //===--------------------------------------------------------------------------------------------===
 #pragma once
+#include <stdbool.h>
+#include <pthread.h>
+#include <XPLMUtilities.h>
+#include <XPLMDataAccess.h>
 
-
-extern const char *htk_cmd_toggle;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 
 typedef struct {
-    union {
-        struct { double x, y, z; };
-        struct { double lat, lon, elev; };
-        struct { double pit, hdg, rll; };
-        double data[3];
-    };
-} vec3_t;
-
+    double axes_limits[6];
+    bool axes_invert[6];
+    float rotation_smooth;
+    float translation_smooth;
+} htk_settings_t;
+extern htk_settings_t htk_settings;
 
 void htk_setup();
 void htk_start();
@@ -29,3 +32,11 @@ void htk_cleanup();
 void htk_frame();
 
 void htk_reset_default_head();
+
+void settings_show();
+bool settings_is_visible();
+void settings_cleanup();
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif

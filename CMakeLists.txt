@@ -1,11 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
-project(htrack VERSION 2011.1 LANGUAGES C)
-
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_C_STANDARD_REQUIRED ON)
+project(htrack VERSION 2011.1 LANGUAGES C CXX)
 
 add_subdirectory(lib/ccore)
-
 if(APPLE)
     link_directories(/usr/local/lib)
 endif()
@@ -16,17 +12,29 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS On)
 set(PLUGIN_SRC
     src/main.c
     src/htrack.c
+    src/settings.cpp
+
+    lib/imgui/imgui.cpp
+    lib/imgui/imgui_demo.cpp
+    lib/imgui/imgui_draw.cpp
+    lib/imgui/imgui_widgets.cpp
+    lib/imgui/misc/cpp/imgui_stdlib.cpp
+    lib/ImgWindow/ImgFontAtlas.cpp
+    lib/ImgWindow/ImgWindow.cpp
 )
 
 add_library(${PROJECT_NAME} SHARED ${PLUGIN_SRC})
+target_compile_features(${PROJECT_NAME} PUBLIC c_std_11 cxx_std_17)
 include_directories(${PROJECT_NAME} PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/sdk/CHeaders/XPLM"
     "SDK/CHeaders/Widgets"
     "${CMAKE_CURRENT_SOURCE_DIR}/sdk/CHeaders/Wrappers"
+    PRIVATE
+    "lib"
 )
 
 add_definitions(-DXPLM200=1 -DXPLM210=1 -DXPLM300=1 -DXPLM301=1)
-target_compile_options(${PROJECT_NAME} PUBLIC -Wall -Wextra -pedantic -Werror)
+target_compile_options(${PROJECT_NAME} PUBLIC -Wall -Wextra -pedantic -fno-exceptions)
 
 if(WIN32)
     target_link_libraries(${PROJECT_NAME} wsock32 ws2_32)
