@@ -6,3 +6,5 @@ build.*
 .cland
 compile_commands.json
 build
+out
+
