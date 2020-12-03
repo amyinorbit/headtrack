@@ -18,7 +18,7 @@ extern "C" {
 
 
 typedef struct {
-    double axes_limits[6];
+    double axes_sens[6];
     bool axes_invert[6];
     float rotation_smooth;
     float translation_smooth;
@@ -38,13 +38,15 @@ void htk_stop();
 void htk_cleanup();
 void htk_frame();
 
-void htk_reset_default_head();
+void htk_settings_did_update();
+void htk_plane_did_load();
 
 void settings_show();
 bool settings_is_visible();
 void settings_cleanup();
 
-void settings_load(bool global);
+bool settings_load_plane();
+void settings_load_global();
 bool settings_save(bool global);
 
 #ifdef __cplusplus

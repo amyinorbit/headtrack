@@ -44,7 +44,7 @@ static void *udp_track_server(void * data) {
     while(server_is_running) {
         ssize_t bytes = recvfrom(server_socket, (void*)udp_data, sizeof(udp_data), 0, NULL, NULL);
         if(bytes < 0) {
-            if(errno != EAGAIN) {
+            if(errno != EAGAIN && errno != EWOULDBLOCK) {
                 CCWARN("server: %s", strerror(errno));
             }
             continue;

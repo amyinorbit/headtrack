@@ -1,4 +1,5 @@
 #include "htrack.h"
+#include "paths.h"
 #include <XPLMPlugin.h>
 #include <XPLMUtilities.h>
 #include <XPLMDisplay.h>
@@ -24,7 +25,6 @@ PLUGIN_API float flight_loop(float since_last, float since_last_fl, int count, v
     CCUNUSED(since_last_fl);
     CCUNUSED(count);
     CCUNUSED(refcon);
-
     htk_frame();
     return -1;
 }
@@ -51,6 +51,7 @@ PLUGIN_API int XPluginStart(char * outName, char * outSig, char *outDesc) {
     cc_set_printer(log_printer);
     CCINFO("HeadTrack - version %s - Amy Alex Parent", HTK_VERSION);
 
+    xpath_reload();
     htk_setup();
     return 1;
 }
@@ -77,5 +78,6 @@ PLUGIN_API void XPluginReceiveMessage(XPLMPluginID id, intptr_t inMessage, void 
     CCUNUSED(inParam);
 
     if(inMessage != XPLM_MSG_PLANE_LOADED) return;
-    htk_reset_default_head();
+    xpath_reload();
+    htk_plane_did_load();
 }

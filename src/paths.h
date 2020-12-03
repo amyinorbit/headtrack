@@ -13,15 +13,11 @@
 extern "C" {
 #endif
 
+void xpath_reload();
+
 const char *xpath_system();
 const char *xpath_plugin();
 const char *xpath_aircraft();
-
-void xpath_plugin_prefix(const char *file, char *out, int max);
-void xpath_system_prefix(const char *file, char *out, int max);
-void xpath_aircraft_prefix(const char *file, char *out, int max);
-
-bool xpath_file_exists(const char *file);
 
 #ifdef __cplusplus
 } /* extern "C" */

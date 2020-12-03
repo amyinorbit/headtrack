@@ -23,6 +23,7 @@ struct {
     bool is_enabled;
     bool is_failed;
     bool must_reset;
+    bool plane_spec;
 
     double viewport_ref[3];
     double head_in[6]; // reported by UDP
@@ -70,12 +71,13 @@ const char *htk_cmd_center_sim = "amyinorbit/htrack/center_sim";
 
 void htk_setup() {
     htk_settings.last_error = NULL;
-    settings_load(true);
+    settings_load_global();
     // htk_settings = defaults;
 
     state.is_failed = false;
     state.is_enabled = false;
     state.must_reset = true;
+    state.plane_spec = false;
 
     state.cmd.toggle = XPLMCreateCommand(htk_cmd_toggle, "toggle head tracking");
     CCASSERT(state.cmd.toggle);
@@ -166,12 +168,6 @@ static void menu_cb(void *menu, void *refcon) {
     CCUNUSED(menu);
     CCUNUSED(refcon);
     settings_show();
-    // Reflect settings window state in the menu;
-    XPLMCheckMenuItem(
-        state.menu.id,
-        state.menu.settings,
-        settings_is_visible() ? xplm_Menu_Checked : xplm_Menu_NoCheck
-    );
 }
 
 void htk_start() {
@@ -218,6 +214,7 @@ void htk_start() {
 }
 
 void htk_stop() {
+    XPLMDestroyMenu(state.menu.id);
     XPLMUnregisterCommandHandler(state.cmd.toggle, toggle_cb, 0, NULL);
     XPLMUnregisterCommandHandler(state.cmd.center_head_tracking, center_head_cb, 0, NULL);
     XPLMUnregisterCommandHandler(state.cmd.center_sim_view, center_sim_cb, 0, NULL);
@@ -229,49 +226,62 @@ void htk_cleanup() {
     settings_cleanup();
 }
 
+static double limits[6];
 
-static const double limits_out[6] = {100, 100, 100, 135, 90, 90};
-
-void htk_reset_default_head() {
+void htk_plane_did_load() {
     if(state.is_failed) return;
     state.must_reset = true;
 }
+static const double limits_out[6] = {100, 100, 100, 135, 90, 90};
+static double limits[6] = {50, 50, 50, 60, 60, 90};
 
+void htk_settings_did_update() {
+    for(int i = 0; i < 6; ++i) {
+        limits[i] = limits_out[i] / htk_settings.axes_sens[i];
+    }
+}
+
+static void reload_plane() {
+    if(!settings_load_plane()) {
+        if(state.plane_spec) settings_load_global();
+        state.plane_spec = false;
+    } else {
+        state.plane_spec = true;
+    }
+    state.must_reset = false;
+    CCINFO("recording default pilot's head position");
+    state.viewport_ref[0] = XPLMGetDataf(state.dr.ref_x);
+    state.viewport_ref[1] = XPLMGetDataf(state.dr.ref_y);
+    state.viewport_ref[2] = XPLMGetDataf(state.dr.ref_z);
+}
 
 void htk_frame() {
 
     if(state.is_failed) return;
-    if(state.must_reset) {
-        settings_load(true);
-        state.must_reset = false;
-        CCINFO("recording default pilot's head position");
-        state.viewport_ref[0] = XPLMGetDataf(state.dr.ref_x);
-        state.viewport_ref[1] = XPLMGetDataf(state.dr.ref_y);
-        state.viewport_ref[2] = XPLMGetDataf(state.dr.ref_z);
-    }
+    if(state.must_reset) reload_plane();
 
     int view_type = XPLMGetDatai(state.dr.view_type);
-    if(view_type != 1026 || !state.is_enabled) return;
 
     memcpy(state.head, state.head_in, sizeof(state.head));
 
     for(int i = 0; i < 6; ++i) {
+        htk_settings.head[i] = state.head_in[i];
         state.head[i] -= state.neutral[i];
         if(htk_settings.axes_invert[i]) state.head[i] = -state.head[i];
     }
+    if(view_type != 1026 || !state.is_enabled) return;
 
     remapd3(state.head,
-        htk_settings.axes_limits,
+        limits,
         limits_out,
         1.f + htk_settings.translation_smooth);
     normd3(state.head + 3);
     remapd3(state.head + 3,
-        htk_settings.axes_limits + 3,
+        limits + 3,
         limits_out + 3,
         1.f + htk_settings.rotation_smooth);
 
     for(int i = 0; i < 6; ++i) {
-        htk_settings.head[i] = state.head_in[i];
         htk_settings.sim[i] = state.head[i];
     }
 

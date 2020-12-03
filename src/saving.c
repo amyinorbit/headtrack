@@ -24,15 +24,15 @@ const char *exc_msg;
 
 static const htk_settings_t defaults = {
     .axes_invert = {true, false, false, false, false, true},
-    .axes_limits = {50.f, 50.f, 50.f, 75.f, 75.f, 90.f},
+    .axes_sens = {2, 2, 2, 2, 2, 0.5},
     .rotation_smooth = .5f,
     .translation_smooth = .5f,
     .input_smooth = .5f
 };
 
-static const char *axes_limits_name[] = {
-    "yaw_limit", "pitch_limit", "roll_limit",
-    "x_limit", "y_limit", "z_limit"
+static const char *axes_sensitivity_name[] = {
+    "yaw_sensitivity", "pitch_sensitivity", "roll_sensitivity",
+    "x_sensitivity", "y_sensitivity", "z_sensitivity"
 };
 
 static const char *axes_reverse_name[] = {
@@ -77,7 +77,7 @@ static double get_f64(cJSON *json, const char *name) {
     return field->valuedouble;
 }
 
-static void load_settings_from(const char *filename) {
+static void settings_load_from(const char *filename) {
     cJSON_Hooks hooks;
     hooks.malloc_fn = cc_alloc;
     hooks.free_fn = cc_free;
@@ -96,7 +96,7 @@ static void load_settings_from(const char *filename) {
         cJSON *axes = cJSON_GetObjectItem(json, "axes");
         if(!axes || !cJSON_IsObject(axes)) fail("missing axes data");
         for(int i = 0; i < 6; ++i) {
-            htk_settings.axes_limits[i] = get_f64(axes, axes_limits_name[i]);
+            htk_settings.axes_sens[i] = get_f64(axes, axes_sensitivity_name[i]);
             htk_settings.axes_invert[i] = get_b(axes, axes_reverse_name[i]);
         }
 
@@ -116,24 +116,27 @@ static void load_settings_from(const char *filename) {
     if(json) cJSON_Delete(json);
 }
 
-void settings_load(bool global) {
+void settings_load_global() {
+    char filename[1024];
+    ccfs_path_concat(filename, sizeof(filename), xpath_plugin(), "config.json", NULL);
+    if(ccfs_path_exists(filename)) {
+        settings_load_from(filename);
+    } else {
+        CCINFO("no global settings found, using defaults");
+        htk_settings = defaults;
+    }
+    htk_settings_did_update();
+}
 
+bool settings_load_plane() {
     char filename[1024];
     ccfs_path_concat(filename, sizeof(filename), xpath_aircraft(), "htrack.json", NULL);
-
-    if(ccfs_path_exists(filename)) {
-        load_settings_from(filename);
-    } else if(global) {
-        ccfs_path_concat(filename, sizeof(filename), xpath_plugin(), "config.json", NULL);
-        if(ccfs_path_exists(filename)) {
-            load_settings_from(filename);
-        } else {
-            CCINFO("No settings found, using defaults");
-            htk_settings = defaults;
-        }
-    } else {
-        CCINFO("No plane-specific settings found");
+    if(!ccfs_path_exists(filename)) {
+        CCINFO("no plane-specific settings found");
+        return false;
     }
+    settings_load_from(filename);
+    return true;
 }
 
 bool settings_save(bool global) {
@@ -154,7 +157,7 @@ bool settings_save(bool global) {
     cJSON *obj = cJSON_CreateObject();
     cJSON *axes = cJSON_AddObjectToObject(obj, "axes");
     for(int i = 0; i < 6; ++i) {
-        cJSON_AddNumberToObject(axes, axes_limits_name[i], htk_settings.axes_limits[i]);
+        cJSON_AddNumberToObject(axes, axes_sensitivity_name[i], htk_settings.axes_sens[i]);
         cJSON_AddBoolToObject(axes, axes_reverse_name[i], htk_settings.axes_invert[i]);
     }
 

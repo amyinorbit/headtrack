@@ -9,8 +9,9 @@
 #include "htrack.h"
 #include <ImgWindow/ImgWindow.h>
 #include <algorithm>
+#include <tgmath.h>
 
-extern "C" float settings_floop_cb(float, float, int, void* inRefcon);
+static const double limits_out[6] = {100, 100, 100, 135, 90, 90};
 
 class SettingsWindow : public ImgWindow {
 public:
@@ -54,9 +55,12 @@ public:
         ImVec4 yellow = ImColor(247, 170, 61);
         ImVec4 red = ImColor(0xff, 0x33, 0x33);
 
-        float limits[6];
+        float sensitivity[6];
 
-        for(int i = 0; i < 6; ++i) limits[i] = htk_settings.axes_limits[i];
+        for(int i = 0; i < 6; ++i) {
+            // sensitivity[i] = pow(htk_settings.axes_sens[i], 0.5);
+            sensitivity[i] = htk_settings.axes_sens[i];
+        }
 
         ImGui::Text("HeadTrack %s by Amy Alex Parent.", HTK_VERSION);
         ImGui::Dummy(ImVec2(0, 10.f));
@@ -84,48 +88,49 @@ public:
         }
 
         ImGui::Dummy(ImVec2(0, 10.f));
-        if(ImGui::CollapsingHeader("Head Motion Limits")) {
+        if(ImGui::CollapsingHeader("Motion Sensitivity")) {
             ImGui::TextColored(nice_pink, "Rotation");
-            ImGui::Text("Head deflection for full in-sim rotation");
             ImGui::Separator();
             ImGui::Text("yaw");
-            ImGui::SliderFloat("##yaw", &limits[3], 1, 90, "%.0f deg");
+            ImGui::SliderFloat("##yaw", &sensitivity[3], 0.1, 5, "%.2fx", 2.f);
             ImGui::SameLine(); ImGui::Checkbox("Reverse##yaw", &htk_settings.axes_invert[3]);
 
             ImGui::Text("pitch");
-            ImGui::SliderFloat("##pitch", &limits[4], 1, 90, "%.0f deg");
+            ImGui::SliderFloat("##pitch", &sensitivity[4], 0.1, 5, "%.2fx", 2.f);
             ImGui::SameLine(); ImGui::Checkbox("Reverse##pitch", &htk_settings.axes_invert[4]);
 
             ImGui::Text("roll");
-            ImGui::SliderFloat("##roll", &limits[5], 1, 180, "%.0f deg");
+            ImGui::SliderFloat("##roll", &sensitivity[5], 0.1, 5, "%.2fx", 2.f);
             ImGui::SameLine(); ImGui::Checkbox("Reverse##roll", &htk_settings.axes_invert[5]);
 
             ImGui::Dummy(ImVec2(0, 10.f));
             ImGui::TextColored(nice_pink, "Translation");
-            ImGui::Text("Head displacement for full in-sim rotation");
             ImGui::Separator();
             ImGui::Text("X Axis");
-            ImGui::SliderFloat("##x", &limits[0], 1, 100, "max: %.0f cm");
+            ImGui::SliderFloat("##x", &sensitivity[0], 0.1, 5, "%.2fx", 2.f);
             ImGui::SameLine(); ImGui::Checkbox("Reverse##x", &htk_settings.axes_invert[0]);
             ImGui::Text("Y Axis");
-            ImGui::SliderFloat("##y", &limits[1], 1, 100, "max: %.0f cm");
+            ImGui::SliderFloat("##y", &sensitivity[1], 0.1, 5, "%.2fx", 2.f);
             ImGui::SameLine(); ImGui::Checkbox("Reverse##y", &htk_settings.axes_invert[1]);
             ImGui::Text("Z Axis");
-            ImGui::SliderFloat("##z", &limits[2], 1, 100, "max: %.0f cm");
+            ImGui::SliderFloat("##z", &sensitivity[2], 0.1, 5, "%.2fx", 2.f);
             ImGui::SameLine(); ImGui::Checkbox("Reverse##z", &htk_settings.axes_invert[2]);
             ImGui::Dummy(ImVec2(0, 10.f));
         }
 
         if(ImGui::CollapsingHeader("Smoothing and Sensitivity")) {
-            ImGui::SliderFloat("Input Smoothing", &htk_settings.input_smooth, 0.f, 1.f, "%.2f");
+            ImGui::Text("Input Smoothing");
+            ImGui::SliderFloat("##input_smoothing", &htk_settings.input_smooth, 0.f, 1.f, "%.2f");
             ImGui::PushStyleColor(ImGuiCol_Text, light_grey);
-            ImGui::TextWrapped("Smoothing reduces jitter due to tracking, but increases input lag.");
+            ImGui::TextWrapped("Input smoothing reduces jitter due to tracking, but increases input lag.");
             ImGui::PopStyleColor();
             ImGui::Dummy(ImVec2(0, 10.f));
-            ImGui::SliderFloat("Rotation Expo", &htk_settings.rotation_smooth, 0.f, 1.f, "%.2f");
-            ImGui::SliderFloat("Translation Expo", &htk_settings.translation_smooth, 0.f, 1.f, "%.2f");
+            ImGui::Text("Rotation Response");
+            ImGui::SliderFloat("##exp_rotation", &htk_settings.rotation_smooth, 0.f, 1.f, "%.2f");
+            ImGui::Text("Translation Response");
+            ImGui::SliderFloat("##exp_translation", &htk_settings.translation_smooth, 0.f, 1.f, "%.2f");
             ImGui::PushStyleColor(ImGuiCol_Text, light_grey);
-            ImGui::TextWrapped("Exponential gives you finer-grained control around the neutral position, at the expense of coarser movement at large head deflections.");
+            ImGui::TextWrapped("Higher response values give you finer-grained control around the neutral position, at the expense of coarser movement at large head deflections.");
             ImGui::PopStyleColor();
 
             ImGui::Dummy(ImVec2(0, 10.f));
@@ -136,27 +141,32 @@ public:
             ImGui::TextColored(nice_pink, "Input (Head)");
             ImGui::PushStyleColor(ImGuiCol_PlotLines, yellow);
 
+            float plot_limits[6];
+            for(int i = 0; i < 6; ++i) {
+                plot_limits[i] = limits_out[i] / htk_settings.axes_sens[i];
+            }
+
             ImGui::PlotLines("##hyaw", head_hist + 3, num_hist, 0, "Yaw",
-                -htk_settings.axes_limits[3], htk_settings.axes_limits[3],
+                -plot_limits[3], plot_limits[3],
                 ImVec2(w/3.3, 30), 6 * sizeof(float));
             ImGui::SameLine();
             ImGui::PlotLines("##hpitch", head_hist + 4, num_hist, 0, "Pitch",
-                -htk_settings.axes_limits[4], htk_settings.axes_limits[4],
+                -plot_limits[4], plot_limits[4],
                 ImVec2(w/3.3, 30), 6 * sizeof(float));
             ImGui::SameLine();
             ImGui::PlotLines("##hroll", head_hist + 5, num_hist, 0, "Roll",
-                -htk_settings.axes_limits[5], htk_settings.axes_limits[5],
+                -plot_limits[5], plot_limits[5],
                 ImVec2(w/3.3, 30), 6 * sizeof(float));
             ImGui::PlotLines("##hx", head_hist + 0, num_hist, 0, "X",
-                -htk_settings.axes_limits[0], htk_settings.axes_limits[0],
+                -plot_limits[0], plot_limits[0],
                 ImVec2(w/3.3, 30), 6 * sizeof(float));
             ImGui::SameLine();
             ImGui::PlotLines("##hy", head_hist + 1, num_hist, 0, "Y",
-                -htk_settings.axes_limits[1], htk_settings.axes_limits[1],
+                -plot_limits[1], plot_limits[1],
                 ImVec2(w/3.3, 30), 6 * sizeof(float));
             ImGui::SameLine();
             ImGui::PlotLines("##hz", head_hist + 2, num_hist, 0, "Z",
-                -htk_settings.axes_limits[2], htk_settings.axes_limits[2],
+                -plot_limits[2], plot_limits[2],
                 ImVec2(w/3.3, 30), 6 * sizeof(float));
 
             ImGui::Dummy(ImVec2(0, 10.f));
@@ -191,7 +201,10 @@ public:
         ImGui::PopStyleColor();
 
 
-        for(int i = 0; i < 6; ++i) htk_settings.axes_limits[i] = limits[i];
+        for(int i = 0; i < 6; ++i)
+            htk_settings.axes_sens[i] = sensitivity[i];
+
+        htk_settings_did_update();
     }
 private:
     float sim_hist[6 * num_hist];
