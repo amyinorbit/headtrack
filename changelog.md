@@ -8,6 +8,10 @@ Made with <3 in Scotland by Amy Alex Parent.
 
 ## 2012.3.0
 
+* [fix] rotation and translation axes were inverted in settings files. *You will need to check and arrange your settings.*
+
+## 2012.3.0
+
 * first experimental macOS build
 * motion range controls are replaced with more intuitive sensitivity ones
 * [fix] the settings window shows head tracking data even when the simulator view isn't tracked.

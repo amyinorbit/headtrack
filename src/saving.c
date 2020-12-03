@@ -31,13 +31,13 @@ static const htk_settings_t defaults = {
 };
 
 static const char *axes_sensitivity_name[] = {
+    "x_sensitivity", "y_sensitivity", "z_sensitivity",
     "yaw_sensitivity", "pitch_sensitivity", "roll_sensitivity",
-    "x_sensitivity", "y_sensitivity", "z_sensitivity"
 };
 
 static const char *axes_reverse_name[] = {
+    "x_reversed", "y_reversed", "z_reversed",
     "yaw_reversed", "pitch_reversed", "roll_reversed",
-    "x_reversed", "y_reversed", "z_reversed"
 };
 
 static char *file_read(const char *path) {
