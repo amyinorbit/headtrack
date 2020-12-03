@@ -2,7 +2,7 @@
 
 HeadTrack is a lightweight plugin for X-Plane that lets you use apps like [SmoothTrack][smoothtrack] to control the cockpit view position and orientation.
 
-![Simulator screenshot with HeadTrack settings window](doc/data.png)
+![Main HeadTrack settings UI](doc/ui.png)
 
 HeadTrack is made with <3 in Scotland. HeadTrack will always be free! If you want to support my X-Plane work, you can [buy me a coffee ☕][ko-fi].
 
@@ -15,8 +15,6 @@ Extract the [downloaded][releases] zip file drop the `htrack` in `x-plane/Resour
 You can enable and disable head tracking, as well as reset the center head and in-simulator positions in the `Plugins > HeadTrack` menu in X-Plane. Point your head tracking app to your PC's IP address and port `4242`, and you should be good to go!
 
 The settings window lets you tweak tracking sensitivity, smoothing and response. It also displays graphs of the current received head position, and of the corresponding cockpit position if tracking is active.
-
-![Main HeadTrack settings UI](doc/ui.png)
 
 Settings saved globally are stored in `x-plane/Resources/plugins/htrack/config.json`. You can also save settings per-plane, and these will be loaded automatically when you load specific planes. These are stored as `htrack.json` in the plane's folder. This can be useful if you want snappier settings for fighter planes and something calmer for jet liners, for example.
 
