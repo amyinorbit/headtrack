@@ -104,12 +104,12 @@ static void settings_load_from(const char *path) {
         }
     }
     
-    get_number(json, toks, n_toks,
-        "smoothing/input_smoothing", &htk_settings.input_smooth);
-    get_number(json, toks, n_toks,
-        "smoothing/exp_rotation", &htk_settings.rotation_smooth);
-    get_number(json, toks, n_toks,
-        "smoothing/exp_translation", &htk_settings.translation_smooth);
+    if(!get_number(json, toks, n_toks,
+        "smoothing/input_smoothing", &htk_settings.input_smooth)) goto errout;
+    if(!get_number(json, toks, n_toks,
+        "smoothing/exp_rotation", &htk_settings.rotation_smooth)) goto errout;
+    if(!get_number(json, toks, n_toks,
+        "smoothing/exp_translation", &htk_settings.translation_smooth)) goto errout;
 errout:
     free(json);
     return;
