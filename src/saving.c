@@ -9,7 +9,7 @@
 #include "htrack.h"
 #include "paths.h"
 #include <stdio.h>
-#include <cjson/cJSON.h>
+#include <jsmn_path.h>
 
 #include <acfutils/helpers.h>
 #include <acfutils/log.h>
@@ -42,66 +42,77 @@ static const char *axes_reverse_name[] = {
     "yaw_reversed", "pitch_reversed", "roll_reversed",
 };
 
-
-static void fail(const char *message) {
-    exc_msg = message;
-    longjmp(exc, 2);
-}
-
-static bool get_b(cJSON *json, const char *name) {
-    cJSON *field = cJSON_GetObjectItemCaseSensitive(json, name);
-    if(!field || !cJSON_IsBool(field)) {
-        fail("missing boolean in config file");
-    }
-    return field->valueint;
-}
-
-static double get_f64(cJSON *json, const char *name) {
-    cJSON *field = cJSON_GetObjectItemCaseSensitive(json, name);
-    if(!field || !cJSON_IsNumber(field)) {
-        fail("missing boolean in config file");
-    }
-    return field->valuedouble;
-}
-
-static void settings_load_from(const char *filename) {
-    cJSON_Hooks hooks;
-    hooks.malloc_fn = safe_malloc;
-    hooks.free_fn = free;
-    cJSON_InitHooks(&hooks);
-    logMsg("loading settings from `%s`", filename);
-
-    char *json_data = NULL;
-    cJSON *json = NULL;
-
-    if(!setjmp(exc)) {
-        json_data = file2str(filename, NULL);
-        if(!json_data) fail("unable to read json file");
-        json = cJSON_Parse(json_data);
-        if(!json) fail("invalid json file");
-
-        cJSON *axes = cJSON_GetObjectItem(json, "axes");
-        if(!axes || !cJSON_IsObject(axes)) fail("missing axes data");
-        for(int i = 0; i < 6; ++i) {
-            htk_settings.axes_sens[i] = get_f64(axes, axes_sensitivity_name[i]);
-            htk_settings.axes_invert[i] = get_b(axes, axes_reverse_name[i]);
-        }
-
-        cJSON *smoothing = cJSON_GetObjectItem(json, "smoothing");
-        if(!axes || !cJSON_IsObject(axes)) fail("missing smoothing data");
-        htk_settings.input_smooth = get_f64(smoothing, "input_smoothing");
-        htk_settings.rotation_smooth = get_f64(smoothing, "exp_rotation");
-        htk_settings.translation_smooth = get_f64(smoothing, "exp_translation");
-        
-        logMsg("settings loaded");
-    } else {
-        logMsg("configuration parsing error: %s", exc_msg);
-    }
-
+static bool as_number(const char *json, const jsmntok_t *tok, float *out) {
     
+    if(tok->type != JSMN_PRIMITIVE) return false;
+    if(json[tok->start] != '+' && json[tok->start] != '-' && !isdigit(json[tok->start])) return false;
+    
+    *out = atof(&json[tok->start]);
+    return true;
+}
 
-    if(json_data) free(json_data);
-    if(json) cJSON_Delete(json);
+static bool as_bool(const char *json, const jsmntok_t *tok, bool *out) {
+    
+    if(tok->type != JSMN_PRIMITIVE) return false;
+    if(json[tok->start] != 't' && json[tok->start] != 'f') return false;
+    
+    *out = (json[tok->start] == 't');
+    return true;
+}
+
+static bool get_number(const char *json, const jsmntok_t *toks, int count, const char *path, float *out) {
+    const jsmntok_t *tok = jsmn_path_lookup(json, toks, count, path);
+    if(!tok) return false;
+    return as_number(json, tok, out);
+}
+
+static void settings_load_from(const char *path) {
+    
+    size_t size = 0;
+    char *json = file2buf(path, &size);
+    if(!json) {
+        logMsg("configuration error: cannot open %s", path);
+        return;
+    }
+    logMsg("loading settings from `%s`", path);
+    
+    jsmn_parser parser;
+    jsmntok_t toks[128];
+    
+    jsmn_init(&parser);
+    int n_toks = jsmn_parse(&parser, json, size, toks, ARRAY_NUM_ELEM(toks));
+    
+    if(toks < 0) {
+        logMsg("config error: invalid JSON file");
+        goto errout;
+    }
+    
+    for(int i = 0; i < 6; ++i) {
+        const jsmntok_t *sens = jsmn_path_lookup_format(json, toks, n_toks,
+            "axes/%s", axes_sensitivity_name[i]);
+        const jsmntok_t *invert = jsmn_path_lookup_format(json, toks, n_toks,
+            "axes/%s", axes_reverse_name[i]);
+            
+        if(!sens || !as_number(json, sens, &htk_settings.axes_sens[i])) {
+            logMsg("missing or bad value for '%s'", axes_sensitivity_name[i]);
+            goto errout;
+        }
+        
+        if(!invert || !as_bool(json, invert, &htk_settings.axes_invert[i])) {
+            logMsg("missing or bad value for '%s'", axes_reverse_name[i]);
+            goto errout;
+        }
+    }
+    
+    get_number(json, toks, n_toks,
+        "smoothing/input_smoothing", &htk_settings.input_smooth);
+    get_number(json, toks, n_toks,
+        "smoothing/exp_rotation", &htk_settings.rotation_smooth);
+    get_number(json, toks, n_toks,
+        "smoothing/exp_translation", &htk_settings.translation_smooth);
+errout:
+    free(json);
+    return;
 }
 
 void settings_load_global() {
@@ -128,45 +139,78 @@ bool settings_load_plane() {
     return true;
 }
 
-bool settings_save(bool global) {
-    cJSON_Hooks hooks;
-    hooks.malloc_fn = safe_malloc;
-    hooks.free_fn = lacf_free;
-    cJSON_InitHooks(&hooks);
+static int level = 0;
 
+static void indent(FILE *f) {
+    for(int i = 0; i < level; ++i) {
+        fprintf(f, "  ");
+    }
+}
+
+static void start_obj(FILE *f, const char *name) {
+    if(!name) {
+        indent(f);
+        fprintf(f, "{\n");
+    } else {
+        indent(f);
+        fprintf(f, "\"%s\": {\n", name);
+    }
+    level += 1;
+}
+
+static void end_obj(FILE *f, bool last) {
+    ASSERT(level > 0);
+    level -= 1;
+    indent(f);
+    if(!last) {
+        fprintf(f, "},\n");
+    } else {
+        fprintf(f, "}\n");
+    }
+}
+
+static void json_bool(FILE *f, const char *key, bool val, bool last) {
+    indent(f);
+    fprintf(f, "\"%s\": %s%s\n", key, val ? "true" : "false", last ? "" : ",");
+}
+
+static void json_float(FILE *f, const char *key, float val, bool last) {
+    indent(f);
+    fprintf(f, "\"%s\": %f%s\n", key, val, last ? "" : ",");
+}
+
+bool settings_save(bool global) {
     char *path = global
         ? mkpathname(xpath_plugin(), "config.json", NULL)
-        : mkpathname(xpath_aircraft(), "config.json", NULL);
+        : mkpathname(xpath_aircraft(), "htrack.json", NULL);
 
     logMsg("saving settings to `%s`", path);
-
-    cJSON *obj = cJSON_CreateObject();
-    cJSON *axes = cJSON_AddObjectToObject(obj, "axes");
-    for(int i = 0; i < 6; ++i) {
-        cJSON_AddNumberToObject(axes, axes_sensitivity_name[i], htk_settings.axes_sens[i]);
-        cJSON_AddBoolToObject(axes, axes_reverse_name[i], htk_settings.axes_invert[i]);
-    }
-
-    cJSON *smoothing = cJSON_AddObjectToObject(obj, "smoothing");
-    cJSON_AddNumberToObject(smoothing, "input_smoothing", htk_settings.input_smooth);
-    cJSON_AddNumberToObject(smoothing, "exp_rotation", htk_settings.rotation_smooth);
-    cJSON_AddNumberToObject(smoothing, "exp_translation", htk_settings.translation_smooth);
-
-    if(!setjmp(exc)) {
-        FILE *out = fopen(path, "rb");
-        if(!out) fail("unable to write json file");
-
-        char *json_data = cJSON_Print(obj);
-        fputs(json_data, out);
-        fclose(out);
-        free(json_data);
-        cJSON_Delete(obj);
-        free(path);
-    } else {
-        logMsg("configuration save error: %s", exc_msg);
+    
+    FILE *out = fopen(path, "wb");
+    if(!out) {
+        logMsg("cannot write configuration file");
         free(path);
         return false;
     }
+    
+    level = 0;
+    start_obj(out, NULL);
+    start_obj(out, "axes");
+    
+    for(int i = 0; i < 6; ++i) {
+        json_float(out, axes_sensitivity_name[i], htk_settings.axes_sens[i], false);
+        json_bool(out, axes_reverse_name[i], htk_settings.axes_invert[i], i == 5);
+    }
+    end_obj(out, false);
+    start_obj(out, "smoothing");
+    json_float(out, "input_smoothing", htk_settings.input_smooth, false);
+    json_float(out, "exp_rotation", htk_settings.rotation_smooth, false);
+    json_float(out, "exp_translation", htk_settings.translation_smooth, true);
+    end_obj(out, true);
+    end_obj(out, true);
+    
+    fclose(out);
+    free(path);
     logMsg("settings saved");
     return true;
 }

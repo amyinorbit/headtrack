@@ -1,0 +1,21 @@
+{
+  "axes": {
+    "x_sensitivity": 2.000000,
+    "x_reversed": true,
+    "y_sensitivity": 2.000000,
+    "y_reversed": false,
+    "z_sensitivity": 2.000000,
+    "z_reversed": false,
+    "yaw_sensitivity": 2.000000,
+    "yaw_reversed": false,
+    "pitch_sensitivity": 2.000000,
+    "pitch_reversed": false,
+    "roll_sensitivity": 0.500000,
+    "roll_reversed": true
+  },
+  "smoothing": {
+    "input_smoothing": 0.500000,
+    "exp_rotation": 0.500000,
+    "exp_translation": 0.500000
+  }
+}

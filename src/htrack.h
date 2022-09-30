@@ -15,7 +15,7 @@ extern "C" {
 
 
 typedef struct {
-    double axes_sens[6];
+    float axes_sens[6];
     bool axes_invert[6];
     float rotation_smooth;
     float translation_smooth;
