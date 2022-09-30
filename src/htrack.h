@@ -8,9 +8,6 @@
 //===--------------------------------------------------------------------------------------------===
 #pragma once
 #include <stdbool.h>
-#include <pthread.h>
-#include <XPLMUtilities.h>
-#include <XPLMDataAccess.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -33,7 +30,7 @@ typedef struct {
 extern htk_settings_t htk_settings;
 
 void htk_setup();
-void htk_start();
+int htk_start();
 void htk_stop();
 void htk_cleanup();
 void htk_frame();

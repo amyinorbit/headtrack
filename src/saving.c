@@ -10,9 +10,11 @@
 #include "paths.h"
 #include <stdio.h>
 #include <cjson/cJSON.h>
-#include <ccore/log.h>
-#include <ccore/memory.h>
-#include <ccore/filesystem.h>
+
+#include <acfutils/helpers.h>
+#include <acfutils/log.h>
+#include <acfutils/safe_alloc.h>
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -40,21 +42,6 @@ static const char *axes_reverse_name[] = {
     "yaw_reversed", "pitch_reversed", "roll_reversed",
 };
 
-static char *file_read(const char *path) {
-    CCASSERT(path);
-    FILE *in = ccfs_file_open(path, CCFS_READ);
-    if(!in) return NULL;
-    fseek(in, 0, SEEK_END);
-    size_t length = ftell(in);
-    fseek(in, 0, SEEK_SET);
-    char *data = cc_alloc(length+1);
-    if(fread(data, 1, length, in) != length) {
-        CCWARN("invalid config read");
-    }
-    data[length] = '\0';
-    fclose(in);
-    return data;
-}
 
 static void fail(const char *message) {
     exc_msg = message;
@@ -79,16 +66,16 @@ static double get_f64(cJSON *json, const char *name) {
 
 static void settings_load_from(const char *filename) {
     cJSON_Hooks hooks;
-    hooks.malloc_fn = cc_alloc;
-    hooks.free_fn = cc_free;
+    hooks.malloc_fn = safe_malloc;
+    hooks.free_fn = free;
     cJSON_InitHooks(&hooks);
-    CCINFO("loading settings from `%s`", filename);
+    logMsg("loading settings from `%s`", filename);
 
     char *json_data = NULL;
     cJSON *json = NULL;
 
     if(!setjmp(exc)) {
-        json_data = file_read(filename);
+        json_data = file2str(filename, NULL);
         if(!json_data) fail("unable to read json file");
         json = cJSON_Parse(json_data);
         if(!json) fail("invalid json file");
@@ -105,54 +92,53 @@ static void settings_load_from(const char *filename) {
         htk_settings.input_smooth = get_f64(smoothing, "input_smoothing");
         htk_settings.rotation_smooth = get_f64(smoothing, "exp_rotation");
         htk_settings.translation_smooth = get_f64(smoothing, "exp_translation");
-
+        
+        logMsg("settings loaded");
     } else {
-        CCERROR("configuration parsing error: %s", exc_msg);
+        logMsg("configuration parsing error: %s", exc_msg);
     }
 
-    CCINFO("settings loaded");
+    
 
     if(json_data) free(json_data);
     if(json) cJSON_Delete(json);
 }
 
 void settings_load_global() {
-    char filename[1024];
-    ccfs_path_concat(filename, sizeof(filename), xpath_plugin(), "config.json", NULL);
-    if(ccfs_path_exists(filename)) {
-        settings_load_from(filename);
+    char *path = mkpathname(xpath_plugin(), "config.json", NULL);
+    if(file_exists(path, NULL)) {
+        settings_load_from(path);
     } else {
-        CCINFO("no global settings found, using defaults");
+        logMsg("no global settings found, using defaults");
         htk_settings = defaults;
     }
+    free(path);
     htk_settings_did_update();
 }
 
 bool settings_load_plane() {
-    char filename[1024];
-    ccfs_path_concat(filename, sizeof(filename), xpath_aircraft(), "htrack.json", NULL);
-    if(!ccfs_path_exists(filename)) {
-        CCINFO("no plane-specific settings found");
+    char *path = mkpathname(xpath_aircraft(), "htrack.json", NULL);
+    if(!file_exists(path, NULL)) {
+        logMsg("no plane-specific settings found");
+        free(path);
         return false;
     }
-    settings_load_from(filename);
+    settings_load_from(path);
+    free(path);
     return true;
 }
 
 bool settings_save(bool global) {
     cJSON_Hooks hooks;
-    hooks.malloc_fn = cc_alloc;
-    hooks.free_fn = cc_free;
+    hooks.malloc_fn = safe_malloc;
+    hooks.free_fn = lacf_free;
     cJSON_InitHooks(&hooks);
 
-    char filename[1024];
-    if(global) {
-        ccfs_path_concat(filename, sizeof(filename), xpath_plugin(), "config.json", NULL);
-    } else {
-        ccfs_path_concat(filename, sizeof(filename), xpath_aircraft(), "htrack.json", NULL);
-    }
+    char *path = global
+        ? mkpathname(xpath_plugin(), "config.json", NULL)
+        : mkpathname(xpath_aircraft(), "config.json", NULL);
 
-    CCINFO("saving settings to `%s`", filename);
+    logMsg("saving settings to `%s`", path);
 
     cJSON *obj = cJSON_CreateObject();
     cJSON *axes = cJSON_AddObjectToObject(obj, "axes");
@@ -167,18 +153,20 @@ bool settings_save(bool global) {
     cJSON_AddNumberToObject(smoothing, "exp_translation", htk_settings.translation_smooth);
 
     if(!setjmp(exc)) {
-        FILE *out = ccfs_file_open(filename, CCFS_WRITE);
+        FILE *out = fopen(path, "rb");
         if(!out) fail("unable to write json file");
 
         char *json_data = cJSON_Print(obj);
         fputs(json_data, out);
         fclose(out);
-        cc_free(json_data);
+        free(json_data);
         cJSON_Delete(obj);
+        free(path);
     } else {
-        CCERROR("configuration save error: %s", exc_msg);
+        logMsg("configuration save error: %s", exc_msg);
+        free(path);
         return false;
     }
-    CCINFO("settings saved");
+    logMsg("settings saved");
     return true;
 }

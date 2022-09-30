@@ -9,7 +9,10 @@
 #include "server.h"
 #include "htrack.h"
 #include "math.h"
-#include <ccore/log.h>
+#include <acfutils/log.h>
+#include <acfutils/helpers.h>
+#include <acfutils/assert.h>
+#include <acfutils/thread.h>
 
 #include <sys/types.h>
 #ifdef WIN32
@@ -30,13 +33,15 @@
 #include <errno.h>
 
 static bool server_is_running;
-static pthread_t server_thread;
+static thread_t server_thread;
 static int server_socket;
 
 
-static void *udp_track_server(void * data) {
-    CCUNUSED(data);
-    CCINFO("Head tracking server now listening on 0.0.0.0:4242");
+static void udp_track_server(void * data) {
+    UNUSED(data);
+
+    thread_set_name("headtrack server");
+    logMsg("Head tracking server now listening on 0.0.0.0:4242");
     server_is_running = true;
 
     double *head_in = data;
@@ -45,7 +50,7 @@ static void *udp_track_server(void * data) {
         ssize_t bytes = recvfrom(server_socket, (void*)udp_data, sizeof(udp_data), 0, NULL, NULL);
         if(bytes < 0) {
             if(errno != EAGAIN && errno != EWOULDBLOCK) {
-                CCWARN("server: %s", strerror(errno));
+                logMsg("server: %s", strerror(errno));
             }
             continue;
         }
@@ -58,15 +63,13 @@ static void *udp_track_server(void * data) {
         }
     }
 
-    CCINFO("shutting down head tracking server");
+    logMsg("shutting down head tracking server");
     close(server_socket);
-
-    return NULL;
 }
 
 bool server_start(double *input) {
-    CCASSERT(input);
-    CCINFO("starting head tracking server");
+    ASSERT(input);
+    logMsg("starting head tracking server");
 
     struct sockaddr_in server_addr;
     memset(&server_addr, 0, sizeof(server_addr));
@@ -87,10 +90,10 @@ bool server_start(double *input) {
     // Bind the socket
     if(bind(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr))) {
         htk_settings.last_error = strerror(errno);
-        CCERROR("unable to start server: %s", htk_settings.last_error);
+        logMsg("unable to start server: %s", htk_settings.last_error);
         return false;
     } else {
-        pthread_create(&server_thread, NULL, udp_track_server, input);
+        thread_create(&server_thread, udp_track_server, input);
         return true;
     }
 }
@@ -98,7 +101,7 @@ bool server_start(double *input) {
 void server_stop() {
     if(!server_is_running) return;
     server_is_running = false;
-    pthread_join(server_thread, NULL);
+    thread_join(&server_thread);
 
 }
 
@@ -106,3 +109,4 @@ bool server_restart(double *input) {
     server_stop();
     return server_start(input);
 }
+

@@ -12,7 +12,10 @@
 
 #include <XPLMGraphics.h>
 #include <XPLMMenus.h>
-#include <ccore/log.h>
+#include <acfutils/assert.h>
+#include <acfutils/dr.h>
+#include <acfutils/log.h>
+
 #include <stdbool.h>
 #include <stdlib.h>
 #include <tgmath.h>
@@ -21,7 +24,7 @@
 
 struct {
     bool is_enabled;
-    bool is_failed;
+    bool has_headshake;
     bool must_reset;
     bool plane_spec;
 
@@ -31,21 +34,21 @@ struct {
     double neutral[6];
 
     struct {
-        XPLMDataRef view_type;
+        dr_t view_type;
 
-        XPLMDataRef ref_x;
-        XPLMDataRef ref_y;
-        XPLMDataRef ref_z;
+        dr_t ref_x;
+        dr_t ref_y;
+        dr_t ref_z;
 
-        XPLMDataRef head_x;
-        XPLMDataRef head_y;
-        XPLMDataRef head_z;
+        dr_t head_x;
+        dr_t head_y;
+        dr_t head_z;
 
-        XPLMDataRef head_pit;
-        XPLMDataRef head_hdg;
-        XPLMDataRef head_rll;
+        dr_t head_pit;
+        dr_t head_hdg;
+        dr_t head_rll;
 
-        XPLMDataRef headshake;
+        dr_t headshake;
     } dr;
 
     struct {
@@ -74,33 +77,32 @@ void htk_setup() {
     settings_load_global();
     // htk_settings = defaults;
 
-    state.is_failed = false;
     state.is_enabled = false;
+    state.has_headshake = false;
     state.must_reset = true;
     state.plane_spec = false;
 
     state.cmd.toggle = XPLMCreateCommand(htk_cmd_toggle, "toggle head tracking");
-    CCASSERT(state.cmd.toggle);
+    ASSERT(state.cmd.toggle);
     state.cmd.center_head_tracking = XPLMCreateCommand(htk_cmd_center_head, "recenter head tracking");
-    CCASSERT(state.cmd.center_head_tracking);
+    ASSERT(state.cmd.center_head_tracking);
     state.cmd.center_sim_view = XPLMCreateCommand(htk_cmd_center_sim, "recenter sim view");
-    CCASSERT(state.cmd.center_sim_view);
+    ASSERT(state.cmd.center_sim_view);
 
-    state.dr.view_type = NULL;
+    logMsg("Setting up datarefs");
 
-    state.dr.ref_x = NULL;
-    state.dr.ref_y = NULL;
-    state.dr.ref_z = NULL;
+    fdr_find(&state.dr.view_type, "sim/graphics/view/view_type");
+    fdr_find(&state.dr.ref_x, "sim/aircraft/view/acf_peX");
+    fdr_find(&state.dr.ref_y, "sim/aircraft/view/acf_peY");
+    fdr_find(&state.dr.ref_z, "sim/aircraft/view/acf_peZ");
 
-    state.dr.head_x = NULL;
-    state.dr.head_y = NULL;
-    state.dr.head_z = NULL;
+    fdr_find(&state.dr.head_pit, "sim/graphics/view/pilots_head_the");
+    fdr_find(&state.dr.head_hdg, "sim/graphics/view/pilots_head_psi");
+    fdr_find(&state.dr.head_rll, "sim/graphics/view/pilots_head_phi");
 
-    state.dr.head_pit = NULL;
-    state.dr.head_hdg = NULL;
-    state.dr.head_rll = NULL;
-
-    state.dr.headshake = NULL;
+    fdr_find(&state.dr.head_x, "sim/graphics/view/pilots_head_x");
+    fdr_find(&state.dr.head_y, "sim/graphics/view/pilots_head_y");
+    fdr_find(&state.dr.head_z, "sim/graphics/view/pilots_head_z");
 
     state.menu.id = 0;
     state.menu.enabled = -1;
@@ -108,25 +110,10 @@ void htk_setup() {
     state.menu.settings = -1;
 }
 
-static XPLMDataRef find_dref_checked(const char *path, bool strict) {
-    XPLMDataRef dr = XPLMFindDataRef(path);
-    if(!dr) {
-        if(strict) {
-            CCERROR("dataref `%s` not found", path);
-            state.is_failed = true;
-            abort();
-        } else {
-            CCINFO("optional dataref `%s` not found", path);
-        }
-    } else {
-        CCINFO("dataref `%s` found", path);
-    }
-    return dr;
-}
 
 static int toggle_cb(XPLMCommandRef cmd, XPLMCommandPhase phase, void *refcon) {
-    CCUNUSED(cmd);
-    CCUNUSED(refcon);
+    UNUSED(cmd);
+    UNUSED(refcon);
     if(phase != xplm_CommandBegin) return 1;
 
     state.is_enabled = !state.is_enabled;
@@ -136,49 +123,49 @@ static int toggle_cb(XPLMCommandRef cmd, XPLMCommandPhase phase, void *refcon) {
         state.menu.enabled,
         state.is_enabled  ? xplm_Menu_Checked : xplm_Menu_NoCheck
     );
-    CCINFO("head tracking is %s", state.is_enabled ? "on" : "off");
-    if(state.dr.headshake) {
-        XPLMSetDatai(state.dr.headshake, state.is_enabled);
+    logMsg("head tracking is %s", state.is_enabled ? "on" : "off");
+    if(state.has_headshake) {
+        dr_seti(&state.dr.headshake, state.is_enabled);
     }
     return 1;
 }
 
 static int center_head_cb(XPLMCommandRef cmd, XPLMCommandPhase phase, void *refcon) {
-    CCUNUSED(cmd);
-    CCUNUSED(refcon);
+    UNUSED(cmd);
+    UNUSED(refcon);
     if(phase != xplm_CommandBegin) return 1;
 
     for(int i = 0; i < 6; ++i) state.neutral[i] = state.head_in[i];
-    CCINFO("saved neutral head position");
+    logMsg("saved neutral head position");
     return 1;
 }
 
 static int center_sim_cb(XPLMCommandRef cmd, XPLMCommandPhase phase, void *refcon) {
-    CCUNUSED(cmd);
-    CCUNUSED(refcon);
+    UNUSED(cmd);
+    UNUSED(refcon);
     if(phase != xplm_CommandBegin) return 1;
-    state.viewport_ref[0] = XPLMGetDataf(state.dr.head_x);
-    state.viewport_ref[1] = XPLMGetDataf(state.dr.head_y);
-    state.viewport_ref[2] = XPLMGetDataf(state.dr.head_z);
-    CCINFO("saved pilot's head location");
+    state.viewport_ref[0] = dr_getf(&state.dr.head_x);
+    state.viewport_ref[1] = dr_getf(&state.dr.head_y);
+    state.viewport_ref[2] = dr_getf(&state.dr.head_z);
+    logMsg("saved pilot's head location");
     return 1;
 }
 
 static void menu_cb(void *menu, void *refcon) {
-    CCUNUSED(menu);
-    CCUNUSED(refcon);
+    UNUSED(menu);
+    UNUSED(refcon);
     settings_show();
 }
 
-void htk_start() {
-    CCINFO("finding plane rotation datarefs");
+int htk_start() {
+    logMsg("finding plane rotation datarefs");
 
     for(int i = 0; i < 6; ++i) {
         state.head_in[i] = 0.0;
         state.neutral[i] = 0.0;
     }
 
-    CCINFO("installing command handler");
+    logMsg("installing command handler");
     XPLMRegisterCommandHandler(state.cmd.toggle, toggle_cb, 0, NULL);
     XPLMRegisterCommandHandler(state.cmd.center_head_tracking, center_head_cb, 0, NULL);
     XPLMRegisterCommandHandler(state.cmd.center_sim_view, center_sim_cb, 0, NULL);
@@ -191,26 +178,10 @@ void htk_start() {
         state.menu.id, "Recenter Head Tracking", state.cmd.center_head_tracking);
     XPLMAppendMenuItemWithCommand(
         state.menu.id, "Recenter Sim View", state.cmd.center_sim_view);
-    state.menu.settings = XPLMAppendMenuItem(state.menu.id, "Settings...", NULL, 0);
+    state.menu.settings = XPLMAppendMenuItem(state.menu.id, "Settings…", NULL, 0);
 
-    CCINFO("Setting up datarefs");
-
-    state.dr.view_type = find_dref_checked("sim/graphics/view/view_type", true);
-    state.dr.ref_x = find_dref_checked("sim/aircraft/view/acf_peX", true);
-    state.dr.ref_y = find_dref_checked("sim/aircraft/view/acf_peY", true);
-    state.dr.ref_z = find_dref_checked("sim/aircraft/view/acf_peZ", true);
-
-    state.dr.head_pit = find_dref_checked("sim/graphics/view/pilots_head_the", true);
-    state.dr.head_hdg = find_dref_checked("sim/graphics/view/pilots_head_psi", true);
-    state.dr.head_rll = find_dref_checked("sim/graphics/view/pilots_head_phi", true);
-
-    state.dr.head_x = find_dref_checked("sim/graphics/view/pilots_head_x", true);
-    state.dr.head_y = find_dref_checked("sim/graphics/view/pilots_head_y", true);
-    state.dr.head_z = find_dref_checked("sim/graphics/view/pilots_head_z", true);
-
-    state.dr.headshake = find_dref_checked("simcoders/headshake/override", false);
-
-    if(!server_start(state.head_in)) state.is_failed = true;
+    state.has_headshake = dr_find(&state.dr.headshake, "simcoders/headshale/override");
+    return server_start(state.head_in);
 }
 
 void htk_stop() {
@@ -229,7 +200,6 @@ void htk_cleanup() {
 static double limits[6];
 
 void htk_plane_did_load() {
-    if(state.is_failed) return;
     state.must_reset = true;
 }
 static const double limits_out[6] = {100, 100, 100, 135, 90, 90};
@@ -249,18 +219,17 @@ static void reload_plane() {
         state.plane_spec = true;
     }
     state.must_reset = false;
-    CCINFO("recording default pilot's head position");
-    state.viewport_ref[0] = XPLMGetDataf(state.dr.ref_x);
-    state.viewport_ref[1] = XPLMGetDataf(state.dr.ref_y);
-    state.viewport_ref[2] = XPLMGetDataf(state.dr.ref_z);
+    logMsg("recording default pilot's head position");
+    state.viewport_ref[0] = dr_getf(&state.dr.ref_x);
+    state.viewport_ref[1] = dr_getf(&state.dr.ref_y);
+    state.viewport_ref[2] = dr_getf(&state.dr.ref_z);
 }
 
 void htk_frame() {
 
-    if(state.is_failed) return;
     if(state.must_reset) reload_plane();
 
-    int view_type = XPLMGetDatai(state.dr.view_type);
+    int view_type = dr_geti(&state.dr.view_type);
 
     memcpy(state.head, state.head_in, sizeof(state.head));
 
@@ -285,11 +254,11 @@ void htk_frame() {
         htk_settings.sim[i] = state.head[i];
     }
 
-    XPLMSetDataf(state.dr.head_x, 1e-2 * state.head[0] + state.viewport_ref[0]);
-    XPLMSetDataf(state.dr.head_y, 1e-2 * state.head[1] + state.viewport_ref[1]);
-    XPLMSetDataf(state.dr.head_z, 1e-2 * state.head[2] + state.viewport_ref[2]);
+    dr_setf(&state.dr.head_x, 1e-2 * state.head[0] + state.viewport_ref[0]);
+    dr_setf(&state.dr.head_y, 1e-2 * state.head[1] + state.viewport_ref[1]);
+    dr_setf(&state.dr.head_z, 1e-2 * state.head[2] + state.viewport_ref[2]);
 
-    XPLMSetDataf(state.dr.head_hdg, normalize_rot(state.head[3]));
-    XPLMSetDataf(state.dr.head_pit, normalize_rot(state.head[4]));
-    XPLMSetDataf(state.dr.head_rll, normalize_rot(state.head[5]));
+    dr_setf(&state.dr.head_hdg, normalize_rot(state.head[3]));
+    dr_setf(&state.dr.head_pit, normalize_rot(state.head[4]));
+    dr_setf(&state.dr.head_rll, normalize_rot(state.head[5]));
 }

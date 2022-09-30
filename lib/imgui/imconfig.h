@@ -14,7 +14,7 @@
 #pragma once
 
 // #include <stdexcept>
-#include <ccore/log.h>
+#include <acfutils/assert.h>
 #include <string>
 
 //--- In cross compilations TARGET_OS_OSX might not be correctly defined
@@ -23,7 +23,7 @@
 #endif
 
 //---- Define assertion handler. Defaults to calling assert().
-#define IM_ASSERT(_EXPR) CCASSERT(_EXPR)
+#define IM_ASSERT(_EXPR) ASSERT(_EXPR)
 
 // If your macro uses multiple statements, make sure is enclosed in a 'do { .. } while (0)' block so it can be used as a single statement.
 //#define IM_ASSERT(_EXPR)  MyAssert(_EXPR)
