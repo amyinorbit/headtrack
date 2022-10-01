@@ -82,7 +82,7 @@ static void settings_load_from(const char *path) {
     jsmn_init(&parser);
     int n_toks = jsmn_parse(&parser, json, size, toks, ARRAY_NUM_ELEM(toks));
     
-    if(toks < 0) {
+    if(n_toks < 0) {
         logMsg("config error: invalid JSON file");
         goto errout;
     }
