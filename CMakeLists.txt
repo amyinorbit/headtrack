@@ -39,4 +39,4 @@ target_compile_features(htrack PUBLIC c_std_11 cxx_std_17)
 target_compile_options(htrack PUBLIC -Wall -Wextra -fno-exceptions)
 
 target_include_directories(htrack PRIVATE "lib")
-target_link_libraries(htrack PUBLIC m acfutils xplm OpenGL::GL)
+target_link_libraries(htrack PUBLIC m acfutils xplm)

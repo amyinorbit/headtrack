@@ -68,7 +68,7 @@ function(find_acfutils dir)
     else()
         target_compile_definitions(acfutils INTERFACE -DAPL=0 -DIBM=0 -DLIN=1)
     endif()
-    target_link_libraries(acfutils INTERFACE ${ACFLIBS})
+    target_link_libraries(acfutils INTERFACE ${ACFLIBS} ${OPENGL_LIBRARIES})
     
 endfunction(find_acfutils)
 
@@ -178,7 +178,7 @@ function(add_xplane_plugin lib_name ...)
     	set_target_properties(${lib_name} PROPERTIES
             LIBRARY_OUTPUT_DIRECTORY
                 "${PROJECT_SOURCE_DIR}/${lib_name}/mac_x64"
-            EXECUTABLE_OUTPUT_DIRECTORY
+            RUNTIME_OUTPUT_DIRECTORY
                 "${PROJECT_SOURCE_DIR}/${lib_name}/mac_x64")
     elseif(WIN32)
         target_compile_definitions(${lib_name} PUBLIC -DAPL=0 -DIBM=1 -DLIN=0)
@@ -186,7 +186,7 @@ function(add_xplane_plugin lib_name ...)
     	set_target_properties(${lib_name} PROPERTIES
             LIBRARY_OUTPUT_DIRECTORY
                 "${PROJECT_SOURCE_DIR}/${lib_name}/win_x64"
-            EXECUTABLE_OUTPUT_DIRECTORY
+            RUNTIME_OUTPUT_DIRECTORY
                 "${PROJECT_SOURCE_DIR}/${lib_name}/win_x64"
             CMAKE_C_FLAGS
                 "${CMAKE_C_FLAGS} -static-libgcc"
@@ -203,7 +203,7 @@ function(add_xplane_plugin lib_name ...)
     	set_target_properties(${lib_name} PROPERTIES
             LIBRARY_OUTPUT_DIRECTORY
                 "${PROJECT_SOURCE_DIR}/${lib_name}/lin_x64"
-            EXECUTABLE_OUTPUT_DIRECTORY
+            RUNTIME_OUTPUT_DIRECTORY
                 "${PROJECT_SOURCE_DIR}/${lib_name}/lin_x64")
     endif()
     
