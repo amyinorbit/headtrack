@@ -16,12 +16,10 @@ find_package(OpenGL REQUIRED)
 
 option(LIBACFUTILS "Directory where libacfutils is installed" "")
 
-find_xplane_sdk("${LIBACFUTILS}/SDK")
-message("${LIBACFUTILS}/SDK")
+find_xplane_sdk("${LIBACFUTILS}/SDK" 301)
 find_acfutils(${LIBACFUTILS})
 
-add_xplane_plugin(
-    htrack 301
+add_xplane_plugin(htrack
     
     src/main.c
     src/htrack.c
@@ -40,5 +38,5 @@ add_xplane_plugin(
 target_compile_features(htrack PUBLIC c_std_11 cxx_std_17)
 target_compile_options(htrack PUBLIC -Wall -Wextra -fno-exceptions)
 
-target_include_directories(htrack PUBLIC ${LIBACFUTILS_INCLUDE_DIR} PRIVATE "lib")
-target_link_libraries(htrack PUBLIC m ${LIBACFUTILS_LIBS} ${OPENGL_LIBRARIES})
+target_include_directories(htrack PRIVATE "lib")
+target_link_libraries(htrack PUBLIC m acfutils ${OPENGL_LIBRARIES})
