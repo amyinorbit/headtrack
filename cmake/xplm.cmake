@@ -40,7 +40,7 @@ function(find_acfutils dir)
     endif()
     
     if(WIN32)
-        list(APPEND ACFLIBS crypt32 ws2_32 gdi32 dbghelp psapi winmm)
+        list(APPEND ACFLIBS crypt32 ws2_32 gdi32 opengl32 dbghelp psapi winmm)
     else()
         list(APPEND ACFLIBS pthread)
     endif()
@@ -180,7 +180,6 @@ function(add_xplane_plugin lib_name ...)
     elseif(WIN32)
         target_compile_definitions(${lib_name} PUBLIC -DAPL=0 -DIBM=1 -DLIN=0)
         target_compile_definitions(${lib_name} PUBLIC -D_WIN32_WINNT=0x0600)
-        target_link_libraries(${lib_name} PUBLIC opengl32)
     	set_target_properties(${lib_name} PROPERTIES
             LIBRARY_OUTPUT_DIRECTORY
                 "${PROJECT_SOURCE_DIR}/${lib_name}/win_x64"
