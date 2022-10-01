@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+
+SRC_DIR=$(pwd)
+BUILD_DIR="$(pwd)/build.tmp"
+
+function write_build_info() {
+    BINARY="$1"
+    PLATFORM="$2"
+    INFO_FILE="$3"
+
+    BUILD_TIME=$(date +"%Y-%m-%dT%H:%M:%SZ")
+    GIT_REV=$(git describe --tags --always)
+    BUILD_ID="$(date +"%m%d")-$GIT_REV-$PLATFORM"
+    
+    echo "Writing build information..."
+    echo "binary: $BINARY" > $INFO_FILE
+    echo "build id: $BUILD_ID" >> $INFO_FILE
+    echo "build time: $BUILD_TIME" >> $INFO_FILE
+    echo "build system: $(uname -srp)" >> $INFO_FILE
+    echo "build git ref: $GIT_REV" >> $INFO_FILE
+    echo "" >> $INFO_FILE
+}
+
+function build_platform() {
+    TARGETS=$1
+    PLATFORM="$2"
+    SRC_DIR="$3"
+    BUILD_DIR="$4"
+    NCPU="$5"
+    
+    # PLUGIN_DIR="$SRC_DIR/q4fms/$PLATFORM"
+    PLATFORM_DIR="$BUILD_DIR/$PLATFORM"
+    
+    CMAKE_FLAGS=(
+        -DCMAKE_BUILD_TYPE=RelWithDbgInfo
+        -DBUILD_OFFLINE=OFF
+        -DBUILD_RELEASE=On
+        -DLIBACFUTILS="$LIBACFUTILS"
+    )
+    if [ "$PLATFORM" == "win_x64" ]; then
+        CMAKE_FLAGS+=(-DCMAKE_TOOLCHAIN_FILE="$SRC_DIR/XCompile.txt")
+        CMAKE_FLAGS+=(-DHOST=x86_64-w64-mingw32)
+    fi
+    
+    mkdir -p "$PLATFORM_DIR"
+    (\
+        cd "$PLATFORM_DIR" && \
+        cmake "${CMAKE_FLAGS[@]}" "$SRC_DIR" && \
+        make "${TARGETS[@]}" -j $NCPUS \
+    ) || exit 1
+    
+    if [ "$PLATFORM" == "win_x64" ]; then
+        MKSYMS="$LIBACFUTILS/tools/mksyms"
+        
+        for TARGET in ${TARGETS[*]}; do
+            PLUGIN_DIR="$SRC_DIR/$TARGET/$PLATFORM"
+            $MKSYMS "$PLUGIN_DIR/$TARGET.xpl" > "$PLUGIN_DIR/syms.txt"
+        done
+    fi
+    
+    for TARGET in ${TARGETS[*]}; do
+        PLUGIN_DIR="$SRC_DIR/$TARGET/$PLATFORM"
+        BINARY_NAME="${PLUGIN_DIR#$SRC_DIR}/$TARGET.xpl"
+        write_build_info "$BINARY_NAME" "$PLATFORM" "$PLUGIN_DIR/build_info.txt"
+    done
+}
+
+# The actual build stuff
+
+if [ -z "$LIBACFUTILS" ]
+then
+    echo "Please set LIBACFUTILS"
+    exit 1
+fi
+
+rm -rf "$BUILD_DIR"
+mkdir -p "$BUILD_DIR"
+
+TARGETS=(htrack)
+
+case $(uname) in
+Linux)
+    NCPUS=$(( $(grep 'processor[[:space:]]\+:' /proc/cpuinfo | wc -l) + 1 ))
+    build_platform $TARGETS "lin_x64" "$SRC_DIR" "$BUILD_DIR" $NCPUS
+    build_platform $TARGETS "win_x64" "$SRC_DIR" "$BUILD_DIR" $NCPUS
+    
+    rm -rf "$BUILD_DIR"
+    ;;
+Darwin)
+    NCPUS=$(( $(sysctl -n hw.ncpu) + 1 ))
+    build_platform $TARGETS "mac_x64" "$SRC_DIR" "$BUILD_DIR" $NCPUS
+    
+    rm -rf "$BUILD_DIR"
+    ;;
+*)
+    echo "Unsupported build platform" >&2
+    exit 1
+    ;;
+esac
