@@ -10,7 +10,7 @@ function(find_acfutils dir)
     
     set(ACFLIB "${dir}/libacfutils-redist/${ARCH}/lib/libacfutils.a")
     
-    set(ACFLIBROOT "${dir}/libacfutils-redist/${ARCH}/lib/")
+    set(ACFLIBROOT "${dir}/libacfutils-redist/${ARCH}/lib")
     set(ACFLIBS
         "${ACFLIBROOT}/libiconv.a"
         "${ACFLIBROOT}/libcairo.a"
@@ -40,7 +40,7 @@ function(find_acfutils dir)
     endif()
     
     if(WIN32)
-        list(APPEND ACFLIBS crypt32 ws2_32 gdi32 dbghelp psapi winmm)
+        list(APPEND ACFLIBS crypt32 ws2_32 gdi32 opengl32 dbghelp psapi winmm)
     else()
         list(APPEND ACFLIBS pthread)
     endif()
