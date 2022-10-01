@@ -6,15 +6,6 @@
 // Licensed under the MIT License
 // =^•.•^=
 //===--------------------------------------------------------------------------------------------===
-#include "server.h"
-#include "htrack.h"
-#include "math.h"
-#include <acfutils/log.h>
-#include <acfutils/helpers.h>
-#include <acfutils/assert.h>
-#include <acfutils/thread.h>
-
-#include <sys/types.h>
 #ifdef WIN32
 #include <winsock2.h>
 #define WIN32_LEAN_AND_MEAN
@@ -25,6 +16,16 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #endif
+
+#include "server.h"
+#include "htrack.h"
+#include "math.h"
+#include <acfutils/log.h>
+#include <acfutils/helpers.h>
+#include <acfutils/assert.h>
+#include <acfutils/thread.h>
+
+#include <sys/types.h>
 
 #include <unistd.h>
 #include <string.h>

@@ -40,7 +40,7 @@ function(find_acfutils dir)
     endif()
     
     if(WIN32)
-        list(APPEND ACFLIBS crypt32 ws2_32 gdi32 opengl32 dbghelp psapi winmm)
+        list(APPEND ACFLIBS crypt32 ws2_32 gdi32 dbghelp psapi winmm)
     else()
         list(APPEND ACFLIBS pthread)
     endif()
@@ -176,12 +176,17 @@ function(add_xplane_plugin lib_name ...)
         target_compile_definitions(${lib_name} PUBLIC -DGL_SILENCE_DEPRECATION)
         target_link_libraries(${lib_name} PUBLIC ${CocoaLib})
     	set_target_properties(${lib_name} PROPERTIES
-            LIBRARY_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/${lib_name}/mac_x64" )
+            LIBRARY_OUTPUT_DIRECTORY
+                "${PROJECT_SOURCE_DIR}/${lib_name}/mac_x64"
+            EXECUTABLE_OUTPUT_DIRECTORY
+                "${PROJECT_SOURCE_DIR}/${lib_name}/mac_x64")
     elseif(WIN32)
         target_compile_definitions(${lib_name} PUBLIC -DAPL=0 -DIBM=1 -DLIN=0)
         target_compile_definitions(${lib_name} PUBLIC -D_WIN32_WINNT=0x0600)
     	set_target_properties(${lib_name} PROPERTIES
             LIBRARY_OUTPUT_DIRECTORY
+                "${PROJECT_SOURCE_DIR}/${lib_name}/win_x64"
+            EXECUTABLE_OUTPUT_DIRECTORY
                 "${PROJECT_SOURCE_DIR}/${lib_name}/win_x64"
             CMAKE_C_FLAGS
                 "${CMAKE_C_FLAGS} -static-libgcc"
@@ -190,12 +195,16 @@ function(add_xplane_plugin lib_name ...)
             CMAKE_SHARED_LIBRARY_LINK_C_FLAGS
                 "${CMAKE_SHARED_LIBRARY_LINK_C_FLAGS} -static-libgcc -s"
             CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS
-                "${CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS}  -static-libgcc -static-libstdc++ -s"
+                "${CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS} -static-libgcc -static-libstdc++ -s"
         )
+        
     else()
         target_compile_definitions(${lib_name} PUBLIC -DAPL=0 -DIBM=0 -DLIN=1)
     	set_target_properties(${lib_name} PROPERTIES
-            LIBRARY_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/${lib_name}/lin_x64" )
+            LIBRARY_OUTPUT_DIRECTORY
+                "${PROJECT_SOURCE_DIR}/${lib_name}/lin_x64"
+            EXECUTABLE_OUTPUT_DIRECTORY
+                "${PROJECT_SOURCE_DIR}/${lib_name}/lin_x64")
     endif()
     
     target_link_libraries(${lib_name} PUBLIC xplm xpwidgets)
