@@ -1,6 +1,6 @@
 binary: /htrack/mac_x64/htrack.xpl
-build id: 1001-2012.3.2-6-g0b1242f-mac_x64
-build time: 2022-10-01T17:42:35Z
+build id: 1001-2012.3.2-9-gdf6761a-mac_x64
+build time: 2022-10-01T18:03:27Z
 build system: Darwin 21.6.0 arm
-build git ref: 2012.3.2-6-g0b1242f
+build git ref: 2012.3.2-9-gdf6761a
 
