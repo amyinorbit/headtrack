@@ -5,6 +5,7 @@ build.*
 .cache
 .cland
 compile_commands.json
+config.json
 build
 out
 
