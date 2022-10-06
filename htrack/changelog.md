@@ -6,6 +6,11 @@ Made with <3 in Scotland by Amy Alex Parent.
 [github.com/amyinorbit/headtrack][github]  
 [ko-fi.com/amyinorbit][ko-fi]
 
+## 2209.1
+
+* add support for arm64 on macOS (X-Plane 12)
+* use Sašo Kiselkov's libacfutils library.
+
 ## 2012.3.0
 
 * [fix] rotation and translation axes were inverted in settings files. *You will need to check and arrange your settings.*

@@ -5,6 +5,7 @@ build.*
 .cache
 .cland
 build_info.txt
+syms.txt
 compile_commands.json
 config.json
 build
