@@ -24,12 +24,24 @@ If you find any bugs or have suggestions on how to make HeadTrack better, you ca
 
 ## Building
 
-If you want to build HeadTrack from source yourself, you will need a C/C++ compiler, CMake 3.12+, and the [cJSON][cjson] library (this was only tested on gcc-style toolchains, including MingW on Windows. It probably will not work with Visual Studio).
 
+If you want to build HeadTrack from source yourself, you will need:
+
+- a C/C++ compiler (tested with GCC and Clang, and MingW on Windows. It will probably
+  not work with MSVC, but feel free to try it!)
+- OpenGL development libraries for your platform
+- a build of [libacfutils][acfutils]
+
+To build headtrack:
+
+    $ cd headtrack
+    $ mkdir build && cd build
+    $ cmake -DLIBACFUTILS=<path to your libacfutils directory> ..
+    $ make
 
 🏳️‍⚧️
 
 [smoothtrack]: https://smoothtrack.app/
 [releases]: https://github.com/amyinorbit/headtrack/releases
 [ko-fi]: https://ko-fi.com/amyinorbit
-[cjson]: https://github.com/DaveGamble/cJSON
+[acfutils]: https://github.com/skiselkov/libacfutils
