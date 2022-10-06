@@ -4,6 +4,7 @@
 build.*
 .cache
 .cland
+build_info.txt
 compile_commands.json
 config.json
 build
