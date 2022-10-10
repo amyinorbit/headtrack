@@ -16,6 +16,9 @@ find_package(OpenGL REQUIRED)
 
 option(LIBACFUTILS "Directory where libacfutils is installed" "")
 
+set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64")
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13")
+
 find_xplane_sdk("${LIBACFUTILS}/SDK" 301)
 find_acfutils(${LIBACFUTILS})
 

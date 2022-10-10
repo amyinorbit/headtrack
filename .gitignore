@@ -1,6 +1,7 @@
 .DS_Store
 *.xpl
 *.ignore
+*.ignore.*
 build.*
 .cache
 .cland
@@ -10,4 +11,6 @@ compile_commands.json
 config.json
 build
 out
+*.zip
+notarize
 
