@@ -1,11 +1,20 @@
 # Use static libc/libgcc etc
 function(use_static_libc)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -static-libgcc" PARENT_SCOPE)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libgcc -static-libstdc++" PARENT_SCOPE)
-    set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS
-        "${CMAKE_SHARED_LIBRARY_LINK_C_FLAGS} -static-libgcc -s" PARENT_SCOPE)
-    set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS
-        "${CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS}  -static-libgcc -static-libstdc++ -s" PARENT_SCOPE)
+    if(WIN32)
+        set(CMAKE_C_FLAGS
+            "${CMAKE_C_FLAGS} -static-libgcc"
+            PARENT_SCOPE)
+        set(CMAKE_CXX_FLAGS
+            "${CMAKE_CXX_FLAGS} -static-libgcc -static-libstdc++"
+            PARENT_SCOPE)
+        set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS
+            "${CMAKE_SHARED_LIBRARY_LINK_C_FLAGS} -static-libgcc -s"
+            PARENT_SCOPE)
+        set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS
+            "${CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS}  -static-libgcc -static-libstdc++ -s"
+            PARENT_SCOPE)
+    endif()
+    
 endfunction(use_static_libc)
 
 # Import acfutils libraries and create an imported target
