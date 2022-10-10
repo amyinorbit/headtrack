@@ -1,11 +1,11 @@
 # Use static libc/libgcc etc
 function(use_static_libc)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -static-libgcc")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libgcc -static-libstdc++")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -static-libgcc" PARENT_SCOPE)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libgcc -static-libstdc++" PARENT_SCOPE)
     set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS
-        "${CMAKE_SHARED_LIBRARY_LINK_C_FLAGS} -static-libgcc -s")
+        "${CMAKE_SHARED_LIBRARY_LINK_C_FLAGS} -static-libgcc -s" PARENT_SCOPE)
     set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS
-        "${CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS}  -static-libgcc -static-libstdc++ -s")
+        "${CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS}  -static-libgcc -static-libstdc++ -s" PARENT_SCOPE)
 endfunction(use_static_libc)
 
 # Import acfutils libraries and create an imported target
@@ -42,12 +42,6 @@ function(find_acfutils dir)
         "${ACFLIBROOT}/libssl.a"
         "${ACFLIBROOT}/libcrypto.a"
     )
-    
-    if(WIN32)
-        list(APPEND ACFLIBS "${ACFLIBROOT}/libglew32mx.a")
-    else()
-        list(APPEND ACFLIBS "${ACFLIBROOT}/libGLEWmx.a")
-    endif()
     
     if(WIN32)
         list(APPEND ACFLIBS crypt32 ws2_32 gdi32)
@@ -87,7 +81,7 @@ function(find_acfutils dir)
     else()
         target_compile_definitions(acfutils INTERFACE -DAPL=0 -DIBM=0 -DLIN=1)
     endif()
-    target_compile_definitions(acfutils INTERFACE -DPCRE2_CODE_UNIT_WIDTH=8)
+    target_compile_definitions(acfutils INTERFACE -DGLEW_STATIC -DPCRE2_CODE_UNIT_WIDTH=8)
     target_link_libraries(acfutils INTERFACE ${ACFLIBS} ${OPENGL_LIBRARIES})
     
 endfunction(find_acfutils)

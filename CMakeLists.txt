@@ -22,6 +22,7 @@ else()
 endif()
 
 option(LIBACFUTILS "Directory where libacfutils is installed" "")
+find_package(OpenGL REQUIRED)
 
 use_static_libc()
 find_acfutils(${LIBACFUTILS})
@@ -45,11 +46,11 @@ add_xplane_plugin(htrack
     lib/ImgWindow/ImgWindow.cpp
 )
 
-find_package(OpenGL REQUIRED)
+message(${OPENGL_LIBRARIES})
 
 target_compile_features(htrack PUBLIC c_std_11 cxx_std_17)
 target_compile_options(htrack PUBLIC -Wall -Wextra -fno-exceptions)
-target_link_libraries(htrack PUBLIC m acfutils xplm xpwidgets ${OPENGL_LIBRARIES})
+target_link_libraries(htrack PUBLIC m acfutils xplm xpwidgets)
 target_include_directories(htrack PRIVATE "lib")
 
 
