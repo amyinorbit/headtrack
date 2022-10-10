@@ -1,3 +1,13 @@
+# Use static libc/libgcc etc
+function(use_static_libc)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -static-libgcc")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libgcc -static-libstdc++")
+    set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS
+        "${CMAKE_SHARED_LIBRARY_LINK_C_FLAGS} -static-libgcc -s")
+    set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS
+        "${CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS}  -static-libgcc -static-libstdc++ -s")
+endfunction(use_static_libc)
+
 # Import acfutils libraries and create an imported target
 function(find_acfutils dir)
     if(WIN32)
@@ -12,6 +22,7 @@ function(find_acfutils dir)
     
     set(ACFLIBROOT "${dir}/libacfutils-redist/${ARCH}/lib")
     set(ACFLIBS
+        "${ACFLIBROOT}/liblzma.a"
         "${ACFLIBROOT}/libiconv.a"
         "${ACFLIBROOT}/libcairo.a"
         "${ACFLIBROOT}/libpixman-1.a"
@@ -27,7 +38,6 @@ function(find_acfutils dir)
         "${ACFLIBROOT}/libshp.a"
         "${ACFLIBROOT}/libcharset.a"
         "${ACFLIBROOT}/libpng16.a"
-        "${ACFLIBROOT}/liblzma.a"
         "${ACFLIBROOT}/libz.a"
         "${ACFLIBROOT}/libssl.a"
         "${ACFLIBROOT}/libcrypto.a"
@@ -40,10 +50,19 @@ function(find_acfutils dir)
     endif()
     
     if(WIN32)
-        list(APPEND ACFLIBS crypt32 ws2_32 gdi32 dbghelp psapi winmm)
+        list(APPEND ACFLIBS crypt32 ws2_32 gdi32)
+        list(APPEND ACFLIBS dbghelp psapi)
+        list(APPEND ACFLIBS bcrypt)
+        list(APPEND ACFLIBS winnm)
+        list(APPEND ACFLIBS "${ACFLIBROOT}/libglew32mx.a")
+    elseif(APPLE)
+        list(APPEND ACFLIBS pthread)
+        list(APPEND ACFLIBS "${ACFLIBROOT}/libGLEWmx.a")
     else()
         list(APPEND ACFLIBS pthread)
+        list(APPEND ACFLIBS "${ACFLIBROOT}/libGLEWmx.a")
     endif()
+    
 
     set(LIBACFUTILS_INCLUDE_DIR
         "${dir}/libacfutils-redist/include"
@@ -57,17 +76,18 @@ function(find_acfutils dir)
     target_include_directories(acfutils INTERFACE
         "${dir}/libacfutils-redist/include"
         "${dir}/libacfutils-redist/${ARCH}/include"
-        "${dir}/src/jsmn")
+        "${dir}/src")
     set_target_properties(acfutils PROPERTIES IMPORTED_LOCATION "${ACFLIB}")
-    
     
     if(APPLE)
         target_compile_definitions(acfutils INTERFACE -DAPL=1 -DIBM=0 -DLIN=0)
+        target_compile_definitions(acfutils INTERFACE -DLACF_GLEW_USE_NATIVE_TLS=0)
     elseif(WIN32)
         target_compile_definitions(acfutils INTERFACE -DAPL=0 -DIBM=1 -DLIN=0)
     else()
         target_compile_definitions(acfutils INTERFACE -DAPL=0 -DIBM=0 -DLIN=1)
     endif()
+    target_compile_definitions(acfutils INTERFACE -DPCRE2_CODE_UNIT_WIDTH=8)
     target_link_libraries(acfutils INTERFACE ${ACFLIBS} ${OPENGL_LIBRARIES})
     
 endfunction(find_acfutils)
@@ -199,7 +219,7 @@ function(add_xplane_plugin lib_name ...)
                 "${PROJECT_SOURCE_DIR}/${lib_name}/lin_x64")
     endif()
     
-    target_link_libraries(${lib_name} PUBLIC xplm xpwidgets)
+    # target_link_libraries(${lib_name} PUBLIC xplm xpwidgets)
     
     set_target_properties(${lib_name} PROPERTIES
         C_VISIBILITY_PRESET hidden

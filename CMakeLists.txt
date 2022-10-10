@@ -10,34 +10,33 @@ add_definitions(
     "-DHTK_VERSION_PATCH=${PROJECT_VERSION_PATCH}"
 )
 
-if(WIN32)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -static-libgcc")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libgcc -static-libstdc++")
-    set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "${CMAKE_SHARED_LIBRARY_LINK_C_FLAGS} -static-libgcc -s")
-    set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "${CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS}  -static-libgcc -static-libstdc++ -s")
-endif()
+if(APPLE)
+	add_definitions(-DAPL=1 -DIBM=0 -DLIN=0)
 
-include(cmake/xplm.cmake)
-find_package(Threads REQUIRED)
-find_package(OpenGL REQUIRED)
+    set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64")
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13")
+elseif(WIN32)
+	add_definitions(-DAPL=0 -DIBM=1 -DLIN=0)
+else()
+	add_definitions(-DAPL=0 -DIBM=0 -DLIN=1)
+endif()
 
 option(LIBACFUTILS "Directory where libacfutils is installed" "")
 
-set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64")
-set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13")
-
-find_xplane_sdk("${LIBACFUTILS}/SDK" 301)
+use_static_libc()
 find_acfutils(${LIBACFUTILS})
+find_xplane_sdk("${LIBACFUTILS}/SDK" 301)
+
 
 add_xplane_plugin(htrack
-    
+
     src/main.c
     src/htrack.c
     src/paths.c
     src/saving.c
     src/server.c
     src/settings.cpp
-    
+
     lib/imgui/imgui.cpp
     lib/imgui/imgui_draw.cpp
     lib/imgui/imgui_widgets.cpp
@@ -45,8 +44,39 @@ add_xplane_plugin(htrack
     lib/ImgWindow/ImgFontAtlas.cpp
     lib/ImgWindow/ImgWindow.cpp
 )
+
+find_package(OpenGL REQUIRED)
+
 target_compile_features(htrack PUBLIC c_std_11 cxx_std_17)
 target_compile_options(htrack PUBLIC -Wall -Wextra -fno-exceptions)
-
+target_link_libraries(htrack PUBLIC m acfutils xplm xpwidgets ${OPENGL_LIBRARIES})
 target_include_directories(htrack PRIVATE "lib")
-target_link_libraries(htrack PUBLIC m acfutils xplm)
+
+
+
+# find_xplane_sdk("${LIBACFUTILS}/SDK" 301)
+# find_acfutils(${LIBACFUTILS})
+#
+# message(${LIBACFUTILS_LIBS})
+#
+# add_xplane_plugin(htrack
+#
+#     src/main.c
+#     src/htrack.c
+#     src/paths.c
+#     src/saving.c
+#     src/server.c
+#     src/settings.cpp
+#
+#     lib/imgui/imgui.cpp
+#     lib/imgui/imgui_draw.cpp
+#     lib/imgui/imgui_widgets.cpp
+#     lib/imgui/misc/cpp/imgui_stdlib.cpp
+#     lib/ImgWindow/ImgFontAtlas.cpp
+#     lib/ImgWindow/ImgWindow.cpp
+# )
+# target_compile_features(htrack PUBLIC c_std_11 cxx_std_17)
+# target_compile_options(htrack PUBLIC -Wall -Wextra -fno-exceptions)
+#
+# target_include_directories(htrack PRIVATE "lib")
+# target_link_libraries(htrack PUBLIC m xplm acfutils)

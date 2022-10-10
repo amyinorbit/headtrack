@@ -9,7 +9,7 @@
 #include "htrack.h"
 #include "paths.h"
 #include <stdio.h>
-#include <jsmn_path.h>
+#include <jsmn/jsmn_path.h>
 
 #include <acfutils/helpers.h>
 #include <acfutils/log.h>
