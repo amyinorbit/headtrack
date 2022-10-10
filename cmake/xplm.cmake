@@ -188,14 +188,6 @@ function(add_xplane_plugin lib_name ...)
                 "${PROJECT_SOURCE_DIR}/${lib_name}/win_x64"
             RUNTIME_OUTPUT_DIRECTORY
                 "${PROJECT_SOURCE_DIR}/${lib_name}/win_x64"
-            CMAKE_C_FLAGS
-                "${CMAKE_C_FLAGS} -static-libgcc"
-            CMAKE_CXX_FLAGS
-                "${CMAKE_CXX_FLAGS} -static-libgcc -static-libstdc++"
-            CMAKE_SHARED_LIBRARY_LINK_C_FLAGS
-                "${CMAKE_SHARED_LIBRARY_LINK_C_FLAGS} -static-libgcc -s"
-            CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS
-                "${CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS} -static-libgcc -static-libstdc++ -s"
         )
         
     else()
