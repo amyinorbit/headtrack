@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.12)
-project(htrack VERSION 2209.1.2 LANGUAGES C CXX)
+project(htrack VERSION 2311.1.0 LANGUAGES C CXX)
 
 include(cmake/xplm.cmake)
 
@@ -32,7 +32,7 @@ find_xplane_sdk("${LIBACFUTILS}/SDK" 301)
 add_xplane_plugin(htrack
 
     src/main.c
-    src/htrack.c
+    src/htrack.cpp
     src/paths.c
     src/saving.c
     src/server.c
