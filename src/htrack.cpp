@@ -9,6 +9,7 @@
 #include "htrack.h"
 #include "server.h"
 #include "math.h"
+#include "X-Camera.h"
 
 #include <XPLMGraphics.h>
 #include <XPLMMenus.h>
@@ -64,6 +65,8 @@ struct {
         int home;
     } menu;
 } state;
+
+X_Camera xCamera;
 
 htk_settings_t htk_settings;
 
@@ -197,7 +200,6 @@ void htk_cleanup() {
     settings_cleanup();
 }
 
-static double limits[6];
 
 void htk_plane_did_load() {
     state.must_reset = true;
@@ -238,7 +240,24 @@ void htk_frame() {
         state.head[i] -= state.neutral[i];
         if(htk_settings.axes_invert[i]) state.head[i] = -state.head[i];
     }
-    if(view_type != 1026 || !state.is_enabled) return;
+    
+    if(!state.is_enabled)
+    {
+        return;
+    }
+    else if(xCamera.isEnabled())
+    {
+        // If X-Camera is present and enabled then we need to be
+        // in either the 3D cockpit view or the free camera view (X-Camera external cameras)
+        if(view_type != 1026 && view_type != 1028)
+        {
+            return;
+        }
+    }
+    else if(view_type != 1026)
+    {
+        return;
+    }
 
     remapd3(state.head,
         limits,
@@ -253,7 +272,21 @@ void htk_frame() {
     for(int i = 0; i < 6; ++i) {
         htk_settings.sim[i] = state.head[i];
     }
+    
+    if(xCamera.isEnabled())
+    {
+        HeadData data;
+        data.X = 1e-2 * state.head[0];
+        data.Y = 1e-2 * state.head[1];
+        data.Z = 1e-2 * state.head[2];
+        data.Yaw = normalize_rot(state.head[3]);
+        data.Pitch = normalize_rot(state.head[4]);
+        data.Roll = normalize_rot(state.head[5] * -1.0f);
+        xCamera.setOffsets(data);
 
+        return;
+    }
+    
     dr_setf(&state.dr.head_x, 1e-2 * state.head[0] + state.viewport_ref[0]);
     dr_setf(&state.dr.head_y, 1e-2 * state.head[1] + state.viewport_ref[1]);
     dr_setf(&state.dr.head_z, 1e-2 * state.head[2] + state.viewport_ref[2]);
