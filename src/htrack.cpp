@@ -281,7 +281,7 @@ void htk_frame() {
         data.Z = 1e-2 * state.head[2];
         data.Yaw = normalize_rot(state.head[3]);
         data.Pitch = normalize_rot(state.head[4]);
-        data.Roll = normalize_rot(state.head[5]);
+        data.Roll = normalize_rot(state.head[5] * -1.0f);
         xCamera.setOffsets(data);
 
         return;
